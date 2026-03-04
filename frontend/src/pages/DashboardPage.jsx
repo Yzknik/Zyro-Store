@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 import { Navigate, Link } from 'react-router-dom'
 import axios from 'axios'
+import API_URL from '../api'
 
 const DashboardPage = () => {
     const { t } = useContext(LangContext)
@@ -23,14 +24,14 @@ const DashboardPage = () => {
         if (!confirm('DESEJA REALMENTE RESETAR SEU HARDWARE ID?')) return
         try {
             setResetting(productId)
-            await axios.post('http://localhost:5000/api/auth/hwid/reset', { product_id: productId }, { withCredentials: true })
+            await axios.post(`${API_URL}/api/auth/hwid/reset`, { product_id: productId }, { withCredentials: true })
             await checkAuth()
         } catch (err) { } finally { setResetting(null) }
     }
 
     const handleToggleStatus = async (licenseId) => {
         try {
-            await axios.post('http://localhost:5000/api/auth/license/toggle', { license_id: licenseId }, { withCredentials: true })
+            await axios.post(`${API_URL}/api/auth/license/toggle`, { license_id: licenseId }, { withCredentials: true })
             await checkAuth()
         } catch (err) { }
     }

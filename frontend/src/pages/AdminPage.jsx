@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 import { Navigate } from 'react-router-dom'
 import axios from 'axios'
+import API_URL from '../api'
 
 const Notification = ({ message, type, onClose }) => {
     useEffect(() => {
@@ -103,47 +104,47 @@ const AdminPage = () => {
 
     const fetchStats = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/admin/stats', { withCredentials: true });
+            const res = await axios.get(`${API_URL}/api/admin/stats`, { withCredentials: true });
             setStats(res.data)
         } catch (e) { console.error('Stats error', e) }
     }
     const fetchCategories = async () => {
-        try { const res = await axios.get('http://localhost:5000/api/admin/categories', { withCredentials: true }); setCategories(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/categories`, { withCredentials: true }); setCategories(res.data) } catch (e) { }
     }
     const fetchProducts = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/products');
+            const res = await axios.get(`${API_URL}/api/products`);
             const prodsWithPlans = await Promise.all(res.data.map(async p => {
-                const plans = await axios.get(`http://localhost:5000/api/products/${p.id}/plans`);
+                const plans = await axios.get(`${API_URL}/api/products/${p.id}/plans`);
                 return { ...p, plans: plans.data };
             }));
             setProducts(prodsWithPlans)
         } catch (e) { }
     }
     const fetchLicenses = async () => {
-        try { const res = await axios.get('http://localhost:5000/api/admin/licenses', { withCredentials: true }); setLicenses(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/licenses`, { withCredentials: true }); setLicenses(res.data) } catch (e) { }
     }
     const fetchModerators = async () => {
-        try { const res = await axios.get('http://localhost:5000/api/admin/moderators', { withCredentials: true }); setModerators(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/moderators`, { withCredentials: true }); setModerators(res.data) } catch (e) { }
     }
 
     const handleCreateCategory = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/admin/categories', { name: newCatName }, { withCredentials: true });
+            await axios.post(`${API_URL}/api/admin/categories`, { name: newCatName }, { withCredentials: true });
             setNewCatName(''); fetchCategories(); notify('CATEGORIA CRIADA!');
         } catch (err) { notify('ERRO AO CRIAR CATEGORIA', 'error') }
     }
 
     const handleDeleteCategory = async (id) => {
         if (!confirm('DESEJA REALMENTE DELETAR ESTA CATEGORIA?')) return
-        try { await axios.delete(`http://localhost:5000/api/admin/categories/${id}`, { withCredentials: true }); fetchCategories(); notify('CATEGORIA REMOVIDA.') } catch (e) { }
+        try { await axios.delete(`${API_URL}/api/admin/categories/${id}`, { withCredentials: true }); fetchCategories(); notify('CATEGORIA REMOVIDA.') } catch (e) { }
     }
 
     const handleCreateProduct = async (e) => {
         e.preventDefault()
         try {
-            await axios.post('http://localhost:5000/api/admin/products', newProduct, { withCredentials: true })
+            await axios.post(`${API_URL}/api/admin/products`, newProduct, { withCredentials: true })
             setNewProduct({ name: '', description: '', category_id: '', image_url: '' })
             fetchProducts(); notify('PRODUTO LANÇADO COM SUCESSO!')
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
@@ -151,51 +152,51 @@ const AdminPage = () => {
 
     const handleDeleteProduct = async (id) => {
         if (!confirm('DELETAR PRODUTO E TODOS OS PLANOS?')) return
-        try { await axios.delete(`http://localhost:5000/api/admin/products/${id}`, { withCredentials: true }); fetchProducts(); notify('PRODUTO REMOVIDO.') } catch (e) { }
+        try { await axios.delete(`${API_URL}/api/admin/products/${id}`, { withCredentials: true }); fetchProducts(); notify('PRODUTO REMOVIDO.') } catch (e) { }
     }
 
     const handleCreatePlan = async (e) => {
         e.preventDefault()
         try {
-            await axios.post('http://localhost:5000/api/admin/plans', newPlan, { withCredentials: true })
+            await axios.post(`${API_URL}/api/admin/plans`, newPlan, { withCredentials: true })
             setNewPlan({ product_id: '', name: '', duration_days: 0, price: 0 })
             fetchProducts(); notify('PLANO ADICIONADO!')
         } catch (err) { notify('ERRO AO CRIAR PLANO', 'error') }
     }
 
     const handleDeletePlan = async (id) => {
-        try { await axios.delete(`http://localhost:5000/api/admin/plans/${id}`, { withCredentials: true }); fetchProducts(); notify('PLANO DELETADO.') } catch (e) { }
+        try { await axios.delete(`${API_URL}/api/admin/plans/${id}`, { withCredentials: true }); fetchProducts(); notify('PLANO DELETADO.') } catch (e) { }
     }
 
     const handleCreateLicense = async (e) => {
         e.preventDefault()
         try {
-            await axios.post('http://localhost:5000/api/admin/assign', newLicense, { withCredentials: true })
+            await axios.post(`${API_URL}/api/admin/assign`, newLicense, { withCredentials: true })
             setNewLicense({ discord_id: '', product_id: '', plan_id: '', duration_days: 0 })
             fetchLicenses(); notify('KEY GERADA COM SUCESSO!')
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
     }
 
     const handleUpdateLicenseStatus = async (id, status) => {
-        try { await axios.patch(`http://localhost:5000/api/admin/licenses/${id}/status`, { status }, { withCredentials: true }); fetchLicenses(); notify('STATUS ATUALIZADO.') } catch (e) { }
+        try { await axios.patch(`${API_URL}/api/admin/licenses/${id}/status`, { status }, { withCredentials: true }); fetchLicenses(); notify('STATUS ATUALIZADO.') } catch (e) { }
     }
 
     const handleDeleteLicense = async (id) => {
         if (!confirm('REVOGAR ESTA KEY PERMANENTEMENTE?')) return
-        try { await axios.delete(`http://localhost:5000/api/admin/licenses/${id}`, { withCredentials: true }); fetchLicenses(); notify('KEY REVOGADA.') } catch (e) { }
+        try { await axios.delete(`${API_URL}/api/admin/licenses/${id}`, { withCredentials: true }); fetchLicenses(); notify('KEY REVOGADA.') } catch (e) { }
     }
 
     const handleAddModerator = async (e) => {
         e.preventDefault()
         try {
-            await axios.post('http://localhost:5000/api/admin/moderators', { discord_id: newModId }, { withCredentials: true })
+            await axios.post(`${API_URL}/api/admin/moderators`, { discord_id: newModId }, { withCredentials: true })
             setNewModId(''); fetchModerators(); notify('MODERADOR ADICIONADO!')
         } catch (err) { notify('ERRO AO ADICIONAR MOD.', 'error') }
     }
 
     const handleRemoveModerator = async (id) => {
         if (!confirm('REMOVER PERMISSÕES DESTE MODERADOR?')) return
-        try { await axios.delete(`http://localhost:5000/api/admin/moderators/${id}`, { withCredentials: true }); fetchModerators(); notify('MODERADOR REMOVIDO.') } catch (e) { }
+        try { await axios.delete(`${API_URL}/api/admin/moderators/${id}`, { withCredentials: true }); fetchModerators(); notify('MODERADOR REMOVIDO.') } catch (e) { }
     }
 
     if (authLoading) return null

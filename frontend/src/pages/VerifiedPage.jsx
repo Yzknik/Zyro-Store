@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 import axios from 'axios'
+import API_URL from '../api'
 
 const VerifiedPage = () => {
     const { t } = useContext(LangContext)
@@ -35,7 +36,7 @@ const VerifiedPage = () => {
 
         setLoading(true)
         try {
-            await axios.post('http://localhost:5000/api/auth/finalize', { username, password }, { withCredentials: true })
+            await axios.post(`${API_URL}/api/auth/finalize`, { username, password }, { withCredentials: true })
             await checkAuth()
             navigate('/dashboard')
         } catch (err) {

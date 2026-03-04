@@ -69,7 +69,7 @@ export const discordCallback = async (req: Request, res: Response) => {
                 // Pegar o nome do cargo mais alto presente (baseado na ordem da nossa lista se necessário)
                 for (const roleId of ADMIN_ROLE_IDS) {
                     if (userRoles.includes(roleId)) {
-                        highestRole = ROLE_NAMES[roleId];
+                        highestRole = ROLE_NAMES[roleId] || 'STAFF';
                         break;
                     }
                 }
@@ -101,7 +101,11 @@ export const discordCallback = async (req: Request, res: Response) => {
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role: highestRole }, process.env.JWT_SECRET!, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-        res.redirect(user.password ? 'http://localhost:3000/dashboard' : 'http://localhost:3000/verified');
+        const host = req.get('host') || 'localhost:5000';
+        const frontendHost = host.split(':')[0];
+        const redirectBase = `http://${frontendHost}:3000`;
+
+        res.redirect(user.password ? `${redirectBase}/dashboard` : `${redirectBase}/verified`);
     } catch (err: any) {
         res.status(500).json({ error: 'Authentication failed' });
     }

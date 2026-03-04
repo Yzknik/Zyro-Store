@@ -2,6 +2,7 @@ import { useState, useContext, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { LangContext } from '../App'
 import axios from 'axios'
+import API_URL from '../api'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
@@ -89,13 +90,13 @@ const ProductsPage = () => {
     const fetchData = async () => {
         try {
             const [prodRes, catRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/products'),
-                axios.get('http://localhost:5000/api/admin/categories', { withCredentials: true }).catch(() => ({ data: [] }))
+                axios.get(`${API_URL}/api/products`),
+                axios.get(`${API_URL}/api/admin/categories`, { withCredentials: true }).catch(() => ({ data: [] }))
             ])
 
             // Para cada produto, precisamos buscar os planos
             const prodsWithPlans = await Promise.all(prodRes.data.map(async (p) => {
-                const planRes = await axios.get(`http://localhost:5000/api/products/${p.id}/plans`).catch(() => ({ data: [] }))
+                const planRes = await axios.get(`${API_URL}/api/products/${p.id}/plans`).catch(() => ({ data: [] }))
                 return { ...p, plans: planRes.data }
             }))
 
