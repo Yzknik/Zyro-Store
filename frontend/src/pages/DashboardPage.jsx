@@ -52,7 +52,7 @@ const DashboardPage = () => {
                 .dash-reveal { animation: floatIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
                 
                 .flat-icon-tag {
-                    width: 50px; height: 50px; border-radius: 18px;
+                    width: 42px; height: 42px; border-radius: 14px;
                     display: flex; items: center; justifyContent: center;
                     position: relative; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                     cursor: pointer; background: #0f172a;
