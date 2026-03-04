@@ -46,40 +46,101 @@ const DashboardPage = () => {
             <Navbar />
 
             <style>{`
-                @keyframes floatIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-                @keyframes shine { 0% { left: -100%; opacity: 0; } 50% { opacity: 0.5; } 100% { left: 100%; opacity: 0; } }
-                .dash-reveal { animation: floatIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
-                
-                .flat-icon-tag {
-                    width: 50px; height: 50px; border-radius: 18px;
-                    display: flex; items: center; justifyContent: center;
-                    position: relative; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                    cursor: pointer; background: #0f172a;
-                    border: 1px solid rgba(255,255,255,0.08);
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-                }
-                .flat-icon-tag:hover { transform: scale(1.15) rotate(5deg); }
-                
-                .icon-ceo { background: linear-gradient(135deg, #ef4444, #7f1d1d); border-color: rgba(239, 68, 68, 0.3); }
-                .icon-staff { background: linear-gradient(135deg, #3b82f6, #1e40af); border-color: rgba(59, 130, 246, 0.3); }
-                .icon-member { background: linear-gradient(135deg, #334155, #0f172a); }
+        /* 1. Animações Refinadas (Spring Physics Style) */
+@keyframes floatIn {
+    from { transform: translateY(20px) scale(0.98); opacity: 0; filter: blur(4px); }
+    to { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+}
 
-                .nav-item { padding: 15px 25px; border-radius: 18px; cursor: pointer; transition: 0.3s; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.5px; border: 1px solid transparent; }
-                .nav-item.active { background: rgba(59, 130, 246, 0.08); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.15); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-                .nav-item:hover:not(.active) { background: rgba(255,255,255,0.02); }
-                
-                .tooltip {
-                    position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
-                    background: #fff; color: #000; padding: 6px 14px; border-radius: 10px; font-size: 0.7rem;
-                    white-space: nowrap; font-weight: 950; opacity: 0; pointer-events: none; transition: 0.3s;
-                    box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-                }
-                .tooltip::after { content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 10px; height: 10px; background: #fff; }
-                .flat-icon-tag:hover .tooltip { opacity: 1; top: -55px; }
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
 
-                .product-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 35px; padding: 2.5rem; transition: 0.4s; }
-                .product-card:hover { border-color: rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.02); transform: translateY(-5px); }
+/* 2. O Ícone (Agora com Glassmorphism) */
+.flat-icon-tag {
+    width: 54px; height: 54px; 
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; 
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); /* Efeito elástico */
+    cursor: pointer;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(8px); /* Efeito de vidro */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.flat-icon-tag:hover {
+    transform: scale(1.1) translateY(-5px) rotate(-3deg);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 3. Cores de Status (Gradientes Vibrantes) */
+.icon-ceo { background: linear-gradient(135deg, #ff416c, #ff4b2b); }
+.icon-staff { background: linear-gradient(135deg, #00c6ff, #0072ff); }
+.icon-member { background: linear-gradient(135deg, #434343, #000000); }
+
+/* 4. Navegação (Menu com Visual Clean) */
+.nav-item {
+    padding: 12px 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #94a3b8;
+    display: flex; align-items: center; gap: 10px;
+}
+
+.nav-item.active {
+    background: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.nav-item:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f8fafc;
+    transform: translateX(5px);
+}
+
+/* 5. Tooltip Elegante */
+.tooltip {
+    position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%) scale(0.8);
+    background: #ffffff; color: #0f172a; 
+    padding: 8px 16px; border-radius: 8px;
+    font-size: 0.75rem; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+
+.flat-icon-tag:hover .tooltip {
+    opacity: 1; transform: translateX(-50%) scale(1);
+}
+
+/* 6. Card de Produto (Premium Dark) */
+.product-card {
+    background: linear-gradient(165deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.5));
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    padding: 2rem;
+    transition: 0.5s;
+    overflow: hidden;
+    position: relative;
+}
+
+.product-card::before { /* Efeito de luz no topo do card */
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+.product-card:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
             `}</style>
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
