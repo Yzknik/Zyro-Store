@@ -7,6 +7,7 @@ import TosPage from './pages/TosPage'
 import VerifiedPage from './pages/VerifiedPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminPage from './pages/AdminPage'
+import ErrorPage from './pages/ErrorPage'
 import { translations } from './i18n'
 import { AuthProvider } from './context/AuthContext'
 
@@ -26,7 +27,7 @@ const CustomCursor = () => {
       }
     }
     const handleInteract = (e) => {
-      const target = e.target.closest('button, a, .tag, input, .card')
+      const target = e.target.closest('button, a, .tag, input, .card, select, textarea')
       setActive(!!target)
     }
     const handleLeave = () => setHidden(true)
@@ -49,7 +50,6 @@ const CustomCursor = () => {
       ref={cursorRef}
       id="custom-cursor"
       className={`${active ? 'active' : ''} ${hidden ? 'hidden' : ''}`}
-      style={{ opacity: hidden ? 0 : 1, transition: 'opacity 0.2s, width 0.3s, height 0.3s' }}
     />
   )
 }
@@ -60,7 +60,7 @@ const MouseSpotlight = () => {
   useEffect(() => {
     const moveLight = (e) => {
       if (lightRef.current) {
-        lightRef.current.style.background = `radial-gradient(800px circle at ${e.clientX}px ${e.clientY}px, rgba(59, 130, 246, 0.06), transparent 80%)`
+        lightRef.current.style.background = `radial-gradient(800px circle at ${e.clientX}px ${e.clientY}px, rgba(51, 102, 255, 0.04), transparent 80%)`
       }
     }
     window.addEventListener('mousemove', moveLight)
@@ -116,6 +116,7 @@ function App() {
               <Route path="/verified" element={<VerifiedPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="*" element={<ErrorPage />} />
             </Routes>
           </div>
         </BrowserRouter>

@@ -4,7 +4,12 @@ import { verifyToken, verifyAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
+// Public info for Homepage and Dashboard
+router.get('/info', adminController.getPublicInfo);
+
 router.use(verifyToken);
+
+// Admin-only routes
 router.use(verifyAdmin);
 
 // Categories
@@ -30,6 +35,17 @@ router.delete('/licenses/:id', adminController.deleteLicense);
 router.get('/moderators', adminController.listModerators);
 router.post('/moderators', adminController.addModerator);
 router.delete('/moderators/:id', adminController.removeModerator);
+
+// Stats & Management
 router.get('/stats', adminController.getStats);
+
+// News
+router.get('/news', adminController.listNews);
+router.post('/news', adminController.createNews);
+router.delete('/news/:id', adminController.deleteNews);
+
+// Settings
+router.get('/settings', adminController.getSettings);
+router.post('/settings', adminController.updateSetting);
 
 export default router;

@@ -74,7 +74,40 @@ const initSchema = () => {
             is_stable INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS platform_updates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
     `);
+
+    // Default settings
+    const defaultSettings = [
+        ['stats_active_users', '12,400+'],
+        ['stats_uptime', '99.9%'],
+        ['stats_detection', '0%'],
+        ['stats_delivery', '100%'],
+        ['discord_link', 'https://discord.gg/zyrostore']
+    ];
+
+    for (const [key, val] of defaultSettings) {
+        db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, val);
+    }
+
+    // Seed dummy data if empty
+    const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
+    if (usersCount.count === 0) {
+        db.prepare("INSERT INTO users (discord_id, username, avatar) VALUES ('1249488594414997676', 'ZyroOwner', 'https://cdn.discordapp.com/embed/avatars/0.png')").run();
+        db.prepare("INSERT INTO products (name, description, image_url) VALUES ('FIVEM EXTERNAL', 'High-end performance external for FiveM.', 'https://placehold.co/600x400/080c14/3366ff?text=FIVEM')").run();
+        db.prepare("INSERT INTO products (name, description, image_url) VALUES ('CS2 INTERNAL', 'Precision internal software for CS2.', 'https://placehold.co/600x400/080c14/3366ff?text=CS2')").run();
+    }
 
     // Migrations
     try { db.prepare('ALTER TABLE users ADD COLUMN password TEXT DEFAULT NULL').run(); } catch (e) { }

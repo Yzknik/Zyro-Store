@@ -101,11 +101,7 @@ export const discordCallback = async (req: Request, res: Response) => {
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role: highestRole }, process.env.JWT_SECRET!, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-        const host = req.get('host') || 'localhost:5000';
-        const frontendHost = host.split(':')[0];
-        const redirectBase = `http://${frontendHost}:3000`;
-
-        res.redirect(user.password ? `${redirectBase}/dashboard` : `${redirectBase}/verified`);
+        res.redirect(user.password ? 'http://localhost:3000/dashboard' : 'http://localhost:3000/verified');
     } catch (err: any) {
         res.status(500).json({ error: 'Authentication failed' });
     }

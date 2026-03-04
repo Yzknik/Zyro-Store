@@ -20,9 +20,9 @@ const Notification = ({ message, type, onClose }) => {
             padding: '16px 24px', borderRadius: '12px', color: '#fff',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
             display: 'flex', alignItems: 'center', gap: '12px',
-            animation: 'slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
+            animation: 'slideIn 0.6s var(--curve-bounce)'
         }}>
-            <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+            <style>{`@keyframes slideIn { from { transform: translateX(100%) scale(0.9); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }`}</style>
             <div style={{
                 width: '24px', height: '24px', borderRadius: '50%',
                 background: type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
@@ -91,6 +91,9 @@ const AdminPage = () => {
     const [newPlan, setNewPlan] = useState({ product_id: '', name: '', duration_days: 0, price: 0 })
     const [newLicense, setNewLicense] = useState({ discord_id: '', product_id: '', plan_id: '', duration_days: 0 })
     const [newModId, setNewModId] = useState('')
+    const [newsList, setNewsList] = useState([])
+    const [allSettings, setAllSettings] = useState({})
+    const [newNews, setNewNews] = useState({ title: '', description: '' })
 
     useEffect(() => { if (isAdmin) refreshData() }, [isAdmin, activeTab])
 
@@ -100,6 +103,8 @@ const AdminPage = () => {
         await fetchCategories();
         await fetchLicenses();
         await fetchModerators();
+        await fetchNews();
+        await fetchSettings();
     }
 
     const fetchStats = async () => {
@@ -126,6 +131,31 @@ const AdminPage = () => {
     }
     const fetchModerators = async () => {
         try { const res = await axios.get(`${API_URL}/api/admin/moderators`, { withCredentials: true }); setModerators(res.data) } catch (e) { }
+    }
+    const fetchNews = async () => {
+        try { const res = await axios.get(`${API_URL}/api/admin/news`, { withCredentials: true }); setNewsList(res.data) } catch (e) { }
+    }
+    const fetchSettings = async () => {
+        try { const res = await axios.get(`${API_URL}/api/admin/settings`, { withCredentials: true }); setAllSettings(res.data) } catch (e) { }
+    }
+
+    const handleCreateNews = async (e) => {
+        e.preventDefault()
+        try {
+            await axios.post(`${API_URL}/api/admin/news`, newNews, { withCredentials: true })
+            setNewNews({ title: '', description: '' }); fetchNews(); notify('NOTÍCIA PUBLICADA!')
+        } catch (err) { notify('ERRO AO PUBLICAR', 'error') }
+    }
+
+    const handleDeleteNews = async (id) => {
+        try { await axios.delete(`${API_URL}/api/admin/news/${id}`, { withCredentials: true }); fetchNews(); notify('NOTÍCIA REMOVIDA.') } catch (e) { }
+    }
+
+    const handleUpdateSetting = async (key, value) => {
+        try {
+            await axios.post(`${API_URL}/api/admin/settings`, { key, value }, { withCredentials: true })
+            fetchSettings(); notify('AJUSTE SALVO!')
+        } catch (err) { notify('ERRO AO SALVAR', 'error') }
     }
 
     const handleCreateCategory = async (e) => {
@@ -209,7 +239,7 @@ const AdminPage = () => {
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', overflowX: 'auto' }}>
-                    {[['dashboard', 'CENTRAL'], ['products', 'STOCKS'], ['categories', 'TAGS'], ['licenses', 'KEYS'], ['moderators', 'ACCESS']].map(([tab, label]) => (
+                    {[['dashboard', 'CENTRAL'], ['products', 'STOCKS'], ['categories', 'TAGS'], ['licenses', 'KEYS'], ['news', 'UPDATES'], ['settings', 'COMMUNITY'], ['moderators', 'ACCESS']].map(([tab, label]) => (
                         <button key={tab} onClick={() => setActiveTab(tab)} style={{ background: 'none', border: 'none', color: activeTab === tab ? '#3b82f6' : 'rgba(255,255,255,0.2)', fontSize: '0.85rem', fontWeight: '950', cursor: 'pointer', transition: '0.3s', letterSpacing: '2px' }}>
                             {label}
                         </button>
@@ -218,16 +248,17 @@ const AdminPage = () => {
 
                 {activeTab === 'dashboard' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.5rem' }}>
                             {[
                                 { label: 'TOTAL USERS', val: stats.users, color: '#3b82f6' },
+                                { label: 'DISCORD', val: stats.discordMembers, color: '#5865F2' },
                                 { label: 'INVENTORY', val: stats.products, color: '#3b82f6' },
                                 { label: 'SALES FLOW', val: stats.totalSales, color: '#3b82f6' },
                                 { label: 'ACTIVE SUBS', val: stats.activeLicenses, color: '#22c55e' }
                             ].map((s, i) => (
                                 <div key={i} className="glass" style={{ padding: '2.5rem', borderRadius: '35px', border: '1px solid rgba(255,255,255,0.02)', background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%)' }}>
-                                    <p style={{ fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', marginBottom: '0.8rem', letterSpacing: '2px' }}>{s.label}</p>
-                                    <h3 style={{ fontSize: '2.4rem', fontWeight: '950', color: s.color }}>{s.val}</h3>
+                                    <p style={{ fontSize: '0.6rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', marginBottom: '0.8rem', letterSpacing: '2px' }}>{s.label}</p>
+                                    <h3 style={{ fontSize: '1.8rem', fontWeight: '950', color: s.color }}>{s.val}</h3>
                                 </div>
                             ))}
                         </div>
@@ -421,6 +452,62 @@ const AdminPage = () => {
                                             <p style={{ margin: 0, fontSize: '0.65rem', color: '#3b82f6', fontWeight: '950', letterSpacing: '1px', marginTop: '4px' }}>ACCESS LEVEL: ADMINISTRATOR</p>
                                         </div>
                                         <button onClick={() => handleRemoveModerator(m.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: '950', fontSize: '0.75rem', cursor: 'pointer' }}>REVOGAR ACESSO</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'news' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                        <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
+                            <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>POSTAR ATUALIZAÇÃO</h3>
+                            <form onSubmit={handleCreateNews} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <input type="text" placeholder="Título da Notícia" value={newNews.title} onChange={e => setNewNews({ ...newNews, title: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                <textarea placeholder="Conteúdo da Atualização" value={newNews.description} onChange={e => setNewNews({ ...newNews, description: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '120px' }} />
+                                <button type="submit" className="btn-primary" style={{ height: '55px', borderRadius: '18px', fontWeight: '950' }}>PUBLICAR NO FEED</button>
+                            </form>
+                        </div>
+                        <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
+                            <h3 style={{ marginBottom: '2rem', fontWeight: '950' }}>FEED HISTÓRICO</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {newsList.map(n => (
+                                    <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center' }}>
+                                        <div>
+                                            <p style={{ margin: 0, fontWeight: '950', fontSize: '0.95rem' }}>{n.title}</p>
+                                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>{new Date(n.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <button onClick={() => handleDeleteNews(n.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', padding: '10px 20px', borderRadius: '12px', fontWeight: '950', fontSize: '0.75rem', cursor: 'pointer' }}>REMOVER</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div style={{ maxWidth: '800px' }}>
+                        <div className="glass" style={{ padding: '3rem', borderRadius: '45px' }}>
+                            <h3 style={{ marginBottom: '2.5rem', fontWeight: '950', letterSpacing: '1px' }}>CONFIGURAÇÕES DA COMUNIDADE</h3>
+                            <div style={{ display: 'grid', gap: '2rem' }}>
+                                {[
+                                    { key: 'stats_active_users', label: 'USUÁRIOS ATIVOS EXIBIDOS', type: 'text' },
+                                    { key: 'stats_uptime', label: 'UPTIME DO SISTEMA (%)', type: 'text' },
+                                    { key: 'stats_detection', label: 'TAXA DE DETECÇÃO (%)', type: 'text' },
+                                    { key: 'stats_delivery', label: 'TAXA DE ENTREGA (%)', type: 'text' },
+                                    { key: 'discord_link', label: 'LINK DO DISCORD', type: 'text' }
+                                ].map(s => (
+                                    <div key={s.key}>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', marginBottom: '10px', letterSpacing: '1px' }}>{s.label}</label>
+                                        <div style={{ display: 'flex', gap: '15px' }}>
+                                            <input
+                                                type="text"
+                                                defaultValue={allSettings[s.key]}
+                                                onBlur={(e) => handleUpdateSetting(s.key, e.target.value)}
+                                                style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }}
+                                            />
+                                        </div>
                                     </div>
                                 ))}
                             </div>

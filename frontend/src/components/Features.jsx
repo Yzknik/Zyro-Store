@@ -2,32 +2,24 @@ import { useContext } from 'react'
 import { Link } from 'react-router-dom'
 import { LangContext } from '../App'
 
-const FeatureCard = ({ icon, title, desc, color, index }) => (
-  <div
-    className="reveal"
-    style={{
-      transitionDelay: `${index * 100}ms`,
-      height: '100%'
-    }}
-  >
-    <div className="card-product glass-blue hover-glow" style={{ padding: '2rem', height: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+const FeatureCard = ({ icon, title, desc, index }) => (
+  <div style={{
+    opacity: 0,
+    animation: 'fadeUp 0.8s ease forwards',
+    animationDelay: `${index * 0.1}s`,
+    height: '100%'
+  }}>
+    <div className="card" style={{ padding: '40px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{
-        width: '50px',
-        height: '50px',
-        borderRadius: '12px',
-        background: `${color}15`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: `1px solid ${color}30`,
-        color: color,
-        boxShadow: `0 0 20px ${color}10`
+        width: '40px',
+        height: '40px',
+        color: 'var(--color-primary)',
       }}>
         {icon}
       </div>
       <div>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#fff', marginBottom: '0.75rem' }}>{title}</h3>
-        <p style={{ fontSize: '0.95rem', color: 'rgba(148, 163, 184, 0.7)', lineHeight: '1.6' }}>{desc}</p>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>{title}</h3>
+        <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>{desc}</p>
       </div>
     </div>
   </div>
@@ -45,26 +37,31 @@ const Features = () => {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
   ]
 
-  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4']
-
   return (
-    <section id="features" style={{ padding: '100px 0', background: '#080c14', position: 'relative' }}>
+    <section id="features" style={{ padding: '140px 0', background: '#050505' }}>
       <div className="container-lg">
 
-        <div style={{ textAlign: 'center', marginBottom: '5rem' }} className="reveal">
-          <span className="badge badge-blue" style={{ marginBottom: '1rem' }}>Recursos de Elite</span>
-          <h2 style={{ fontSize: 'clamp(2.5rem, 5vw, 3.5rem)', fontWeight: '900', color: '#fff', marginBottom: '1.5rem', letterSpacing: '-0.02em' }}>
-            Por que escolher a <span className="glow-text">Zyro</span> ?
+        <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+          <span style={{
+            fontSize: '0.7rem',
+            fontWeight: '800',
+            color: 'var(--color-primary)',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            display: 'block',
+            marginBottom: '16px'
+          }}>
+            ELITE FEATURES
+          </span>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#fff' }}>
+            Engineered for Precision
           </h2>
-          <p style={{ fontSize: '1.1rem', color: 'rgba(148, 163, 184, 0.6)', maxWidth: '600px', margin: '0 auto' }}>
-            Trabalhamos duro para oferecer a melhor experiência, com foco total em segurança e estabilidade para nossos usuários.
-          </p>
         </div>
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '2rem'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '24px'
         }}>
           {t.features.items.map((f, i) => (
             <FeatureCard
@@ -73,22 +70,21 @@ const Features = () => {
               icon={icons[i]}
               title={f.title}
               desc={f.description}
-              color={colors[i]}
             />
           ))}
         </div>
 
-        {/* ── Unique CTA Bottom ── */}
-        <div className="reveal" style={{ marginTop: '6rem' }}>
-          <div className="glass" style={{ borderRadius: '24px', padding: '3rem', border: '1px solid rgba(59,130,246,0.15)', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'rgba(59,130,246,0.1)', filter: 'blur(80px)', borderRadius: '50%' }} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
-              <div style={{ flex: '1 1 400px' }}>
-                <h3 style={{ fontSize: '2rem', fontWeight: '900', color: '#fff', marginBottom: '1rem' }}>Pronto para elevar seu jogo?</h3>
-                <p style={{ color: 'rgba(148, 163, 184, 0.8)', fontSize: '1.1rem' }}>Junte-se a milhares de jogadores que já utilizam a Zyro.</p>
-              </div>
-              <Link to="/products" className="btn-primary" style={{ padding: '16px 40px', fontSize: '1.1rem' }}>Ver Catálogo Completo</Link>
-            </div>
+        {/* CTA Section */}
+        <div style={{ marginTop: '100px', textAlign: 'center' }}>
+          <div className="card" style={{
+            padding: '60px',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
+            maxWidth: '800px',
+            margin: '0 auto'
+          }}>
+            <h3 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '16px' }}>Ready to elevate your game?</h3>
+            <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: '32px' }}>Join over 10,000 players already using Zyro.</p>
+            <Link to="/products" className="btn-primary" style={{ padding: '16px 40px' }}>Explore Catalog</Link>
           </div>
         </div>
 
