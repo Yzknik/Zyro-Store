@@ -50,38 +50,64 @@ const VerifiedPage = () => {
         <div style={{ minHeight: '100vh', background: '#080c14', color: '#fff' }}>
             <Navbar />
 
-            <div style={{ paddingTop: '140px', paddingBottom: '100px', display: 'flex', justifyContent: 'center' }}>
-                <div className="glass reveal active" style={{ width: '100%', maxWidth: '450px', padding: '3rem', borderRadius: '30px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                        <div style={{ width: '70px', height: '70px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
-                            <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+            <div style={{ paddingTop: '140px', paddingBottom: '100px', display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 10 }}>
+                {/* Background Glows */}
+                <div style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translate(-50%, -50%)', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(34, 197, 94, 0.05) 0%, transparent 70%)', pointerEvents: 'none' }}></div>
+
+                <div className="glass reveal active" style={{
+                    width: '100%',
+                    maxWidth: '480px',
+                    padding: '3.5rem',
+                    borderRadius: '40px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+                    backdropFilter: 'blur(30px)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                }}>
+                    <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                        <div style={{
+                            width: '80px',
+                            height: '80px',
+                            background: 'rgba(34, 197, 94, 0.1)',
+                            borderRadius: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.5rem',
+                            border: '1px solid rgba(34, 197, 94, 0.2)',
+                            boxShadow: '0 10px 20px rgba(34, 197, 94, 0.1)',
+                            transform: 'rotate(-5deg)'
+                        }}>
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
                         </div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '950', marginBottom: '0.5rem' }}>
+                        <h1 style={{ fontSize: '2.5rem', fontWeight: '950', marginBottom: '0.5rem', letterSpacing: '-1.5px', background: 'linear-gradient(to bottom, #fff, rgba(255,255,255,0.5))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                             {t.nav.tos === 'ToS' ? 'Verified!' : 'Verificado!'}
                         </h1>
-                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1rem' }}>
-                            {t.nav.tos === 'ToS' ? 'Complete your profile setup' : 'Complete a configuração do seu perfil'}
+                        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.95rem', fontWeight: '500' }}>
+                            {t.nav.tos === 'ToS' ? 'Secure your new Zyro account' : 'Proteja sua nova conta Zyro'}
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
-                                {t.nav.tos === 'ToS' ? 'CHOOSE USERNAME' : 'ESCOLHA UM USUÁRIO'}
+                            <label style={{ display: 'block', marginBottom: '0.8rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: '900', letterSpacing: '2px' }}>
+                                {t.nav.tos === 'ToS' ? 'IDENTITY / USERNAME' : 'IDENTIDADE / USUÁRIO'}
                             </label>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
-                                placeholder="Username"
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', color: '#fff', outline: 'none' }}
+                                placeholder="ex: ZyroUser"
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '18px', padding: '16px 20px', color: '#fff', outline: 'none', fontSize: '1rem', transition: '0.3s' }}
+                                onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.05)'}
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
-                                {t.nav.tos === 'ToS' ? 'CREATE PASSWORD' : 'CRIAR SENHA'}
+                            <label style={{ display: 'block', marginBottom: '0.8rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: '900', letterSpacing: '2px' }}>
+                                {t.nav.tos === 'ToS' ? 'CREATE ACCESS KEY' : 'CRIAR CHAVE DE ACESSO'}
                             </label>
                             <input
                                 type="password"
@@ -89,13 +115,15 @@ const VerifiedPage = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 placeholder="••••••••"
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', color: '#fff', outline: 'none' }}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '18px', padding: '16px 20px', color: '#fff', outline: 'none', fontSize: '1rem', transition: '0.3s' }}
+                                onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.05)'}
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
-                                {t.nav.tos === 'ToS' ? 'CONFIRM PASSWORD' : 'CONFIRMAR SENHA'}
+                            <label style={{ display: 'block', marginBottom: '0.8rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: '900', letterSpacing: '2px' }}>
+                                {t.nav.tos === 'ToS' ? 'REPEAT ACCESS KEY' : 'REPETIR CHAVE DE ACESSO'}
                             </label>
                             <input
                                 type="password"
@@ -103,14 +131,16 @@ const VerifiedPage = () => {
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
                                 placeholder="••••••••"
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', color: '#fff', outline: 'none' }}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '18px', padding: '16px 20px', color: '#fff', outline: 'none', fontSize: '1rem', transition: '0.3s' }}
+                                onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.05)'}
                             />
                         </div>
 
-                        {error && <p style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: '600', textAlign: 'center' }}>{error}</p>}
+                        {error && <p style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: '800', textAlign: 'center', background: 'rgba(239, 68, 68, 0.05)', padding: '10px', borderRadius: '10px' }}>{error}</p>}
 
-                        <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '15px', borderRadius: '12px', marginTop: '0.5rem', width: '100%', fontSize: '1rem' }}>
-                            {loading ? (t.nav.tos === 'ToS' ? 'SAVING...' : 'SALVANDO...') : (t.nav.tos === 'ToS' ? 'ENTER DASHBOARD' : 'ENTRAR NO PAINEL')}
+                        <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '20px', borderRadius: '20px', marginTop: '1rem', width: '100%', fontSize: '1.1rem', fontWeight: '950', boxShadow: '0 10px 30px rgba(51, 102, 255, 0.3)' }}>
+                            {loading ? (t.nav.tos === 'ToS' ? 'SECURE_SAVING...' : 'PROTEGENDO_CONTA...') : (t.nav.tos === 'ToS' ? 'INITIALIZE SYSTEM' : 'INICIALIZAR SISTEMA')}
                         </button>
                     </form>
                 </div>

@@ -45,34 +45,134 @@ const Notification = ({ message, type, onClose }) => {
     )
 }
 
-const ActivityChart = ({ data, color = "#3b82f6" }) => {
-    if (!data || data.length === 0) return <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)' }}>Nenhum dado disponível</div>;
+const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
+    const [hovered, setHovered] = useState(null);
+    if (!data || data.length === 0) return (
+        <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)', fontSize: '0.8rem' }}>
+            Nenhum dado disponível
+        </div>
+    );
 
     const maxVal = Math.max(...data, 1);
-    const points = data.map((val, i) => `${(i / (data.length - 1)) * 100},${90 - (val / maxVal) * 70}`).join(" ");
+    const H = 100; // SVG coordinate height
+    const chartTop = 10;   // top padding in SVG units
+    const chartBot = 88;   // bottom of chart area in SVG units
+
+    // Map value → SVG Y coordinate
+    const toY = (v) => chartBot - (v / maxVal) * (chartBot - chartTop);
+
+    // SVG polyline points string (x in %, y in SVG units)
+    const pts = data.map((v, i) => `${(i / (data.length - 1)) * 100},${toY(v)}`).join(' ');
+
+    // Day labels
+    const days = data.map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (data.length - 1 - i));
+        return d;
+    });
+
+    // Dot overlay: positions in % of the container so no SVG distortion
+    const dotTopPct = (v) => ((toY(v)) / H) * 100 + '%';   // maps SVG Y → CSS top%
+    const dotLeftPct = (i) => `${(i / (data.length - 1)) * 100}%`;
 
     return (
-        <div style={{ width: '100%', height: '180px', position: 'relative', marginTop: '30px' }}>
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity="0.4" />
-                        <stop offset="100%" stopColor={color} stopOpacity="0" />
-                    </linearGradient>
-                </defs>
-                <path d={`M0,100 L0,${90 - (data[0] / maxVal) * 70} L${points} L100,100 Z`} fill="url(#chartGradient)" />
-                <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)', filter: 'drop-shadow(0 0 8px ' + color + '55)' }} />
-                {data.map((val, i) => (
-                    <circle key={i} cx={(i / (data.length - 1)) * 100} cy={90 - (val / maxVal) * 70} r="1.5" fill="#fff" stroke={color} strokeWidth="1" />
+        <div style={{ width: '100%', position: 'relative', marginTop: '30px' }}>
+            {/* SVG — only draws the path & gradient, preserveAspectRatio:none is safe here for shapes */}
+            <div style={{ width: '100%', height: '160px', position: 'relative' }}>
+                <svg
+                    viewBox={`0 0 100 ${H}`}
+                    preserveAspectRatio="none"
+                    style={{ width: '100%', height: '100%', display: 'block' }}
+                >
+                    <defs>
+                        <linearGradient id={`cg-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+                            <stop offset="100%" stopColor={color} stopOpacity="0" />
+                        </linearGradient>
+                    </defs>
+                    {/* filled area */}
+                    <path
+                        d={`M0,${H} L0,${toY(data[0])} L${pts} L100,${H} Z`}
+                        fill={`url(#cg-${color.replace('#', '')})`}
+                    />
+                    {/* line — vectorEffect prevents stroke-width from being squashed */}
+                    <polyline
+                        points={pts}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ filter: `drop-shadow(0 0 6px ${color}66)` }}
+                    />
+                </svg>
+
+                {/* HTML dots — rendered on top, use CSS % positioning so they're never distorted */}
+                {data.map((v, i) => (
+                    <div
+                        key={i}
+                        onMouseEnter={() => setHovered(i)}
+                        onMouseLeave={() => setHovered(null)}
+                        style={{
+                            position: 'absolute',
+                            left: dotLeftPct(i),
+                            top: dotTopPct(v),
+                            transform: 'translate(-50%, -50%)',
+                            width: hovered === i ? '12px' : '8px',
+                            height: hovered === i ? '12px' : '8px',
+                            borderRadius: '50%',
+                            background: hovered === i ? color : '#fff',
+                            border: `2px solid ${color}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            zIndex: 10,
+                            boxShadow: hovered === i ? `0 0 10px ${color}99` : 'none',
+                        }}
+                    />
                 ))}
-            </svg>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', fontWeight: '950', letterSpacing: '1px' }}>
-                <span>ÚLTIMOS 7 DIAS</span>
+
+                {/* Tooltip */}
+                {hovered !== null && (() => {
+                    const isRight = hovered > data.length * 0.6;
+                    return (
+                        <div style={{
+                            position: 'absolute',
+                            left: dotLeftPct(hovered),
+                            top: dotTopPct(data[hovered]),
+                            transform: `translate(${isRight ? 'calc(-100% - 12px)' : '12px'}, -50%)`,
+                            background: 'rgba(5, 8, 18, 0.97)',
+                            border: `1px solid ${color}30`,
+                            borderRadius: '14px',
+                            padding: '10px 15px',
+                            pointerEvents: 'none',
+                            zIndex: 20,
+                            backdropFilter: 'blur(20px)',
+                            boxShadow: `0 10px 30px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)`,
+                            minWidth: '130px',
+                            animation: 'fadeIn 0.12s ease',
+                            whiteSpace: 'nowrap',
+                        }}>
+                            <p style={{ margin: 0, fontSize: '0.58rem', fontWeight: '900', color: 'rgba(255,255,255,0.25)', letterSpacing: '1.5px', marginBottom: '5px' }}>
+                                {days[hovered]?.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()}
+                            </p>
+                            <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: '950', color: data[hovered] > 0 ? color : 'rgba(255,255,255,0.15)', lineHeight: 1, letterSpacing: '-1px' }}>
+                                {data[hovered]}
+                            </p>
+                            <p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{label}</p>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.58rem', color: 'rgba(255,255,255,0.18)', fontWeight: '900', letterSpacing: '1.5px' }}>
+                <span>ÚLTIMOS {data.length} DIAS</span>
                 <span>HOJE</span>
             </div>
         </div>
     );
 };
+
 
 const ConfirmModal = ({ isOpen, title, message, confirmText = "CONFIRMAR", onConfirm, onCancel }) => {
     if (!isOpen) return null;
@@ -120,8 +220,206 @@ const ConfirmModal = ({ isOpen, title, message, confirmText = "CONFIRMAR", onCon
     )
 }
 
+const InputModal = ({ isOpen, title, subtitle, placeholder, icon, accentColor = '#22c55e', confirmText = 'CONFIRMAR', onConfirm, onCancel }) => {
+    const [value, setValue] = useState('');
+    if (!isOpen) return null;
+    const handleConfirm = () => {
+        if (!value || isNaN(value) || parseFloat(value) <= 0) return;
+        onConfirm(parseFloat(value));
+        setValue('');
+    };
+    const handleCancel = () => { onCancel(); setValue(''); };
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.87)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001,
+            animation: 'fadeIn 0.25s ease'
+        }} onClick={e => { if (e.target === e.currentTarget) handleCancel(); }}>
+            <div style={{
+                background: 'linear-gradient(135deg, #0d1525 0%, #0a0f1e 100%)',
+                border: `1px solid ${accentColor}22`,
+                borderRadius: '28px', padding: '42px', width: '90%', maxWidth: '440px',
+                boxShadow: `0 40px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)`,
+                animation: 'pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}>
+                {/* Icon */}
+                <div style={{
+                    width: '65px', height: '65px',
+                    background: `${accentColor}15`,
+                    border: `1px solid ${accentColor}30`,
+                    borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 28px',
+                    boxShadow: `0 8px 25px -5px ${accentColor}30`
+                }}>
+                    {icon || <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>}
+                </div>
+
+                {/* Title */}
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '-0.5px', marginBottom: '8px', textAlign: 'center' }}>{title}</h2>
+                {subtitle && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', textAlign: 'center', marginBottom: '30px', lineHeight: '1.5' }}>{subtitle}</p>}
+
+                {/* Input */}
+                <div style={{ position: 'relative', marginBottom: '24px' }}>
+                    <span style={{
+                        position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)',
+                        fontSize: '1rem', fontWeight: '900', color: accentColor, opacity: 0.8
+                    }}>R$</span>
+                    <input
+                        type="number"
+                        autoFocus
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); if (e.key === 'Escape') handleCancel(); }}
+                        placeholder={placeholder || '0.00'}
+                        style={{
+                            width: '100%',
+                            background: 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${value && !isNaN(value) && parseFloat(value) > 0 ? accentColor + '55' : 'rgba(255,255,255,0.08)'}`,
+                            padding: '18px 20px 18px 50px',
+                            borderRadius: '16px',
+                            color: '#fff',
+                            fontSize: '1.4rem',
+                            fontWeight: '900',
+                            outline: 'none',
+                            transition: '0.2s',
+                            boxSizing: 'border-box',
+                            boxShadow: value && !isNaN(value) && parseFloat(value) > 0 ? `0 0 0 3px ${accentColor}15` : 'none'
+                        }}
+                    />
+                </div>
+
+                {/* Buttons */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={handleCancel}
+                        style={{
+                            flex: 1, padding: '16px', borderRadius: '14px',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.5)',
+                            fontWeight: '800', cursor: 'pointer', fontSize: '0.8rem', letterSpacing: '1px',
+                            transition: '0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
+                        onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                    >
+                        CANCELAR
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        disabled={!value || isNaN(value) || parseFloat(value) <= 0}
+                        style={{
+                            flex: 2, padding: '16px', borderRadius: '14px', border: 'none',
+                            background: value && !isNaN(value) && parseFloat(value) > 0
+                                ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
+                                : 'rgba(255,255,255,0.05)',
+                            color: value && !isNaN(value) && parseFloat(value) > 0 ? '#fff' : 'rgba(255,255,255,0.2)',
+                            fontWeight: '950', cursor: value && !isNaN(value) && parseFloat(value) > 0 ? 'pointer' : 'not-allowed',
+                            fontSize: '0.85rem', letterSpacing: '1px',
+                            boxShadow: value && !isNaN(value) && parseFloat(value) > 0 ? `0 8px 20px -5px ${accentColor}55` : 'none',
+                            transition: '0.3s'
+                        }}
+                    >
+                        {confirmText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ROLES = [
+    { value: 'user', label: 'USER', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.04)', icon: '👤', desc: 'Acesso padrão ao painel' },
+    { value: 'reseller', label: 'RESELLER', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', icon: '💹', desc: 'Pode gerar chaves com saldo' },
+    { value: 'admin', label: 'ADMIN', color: '#3366ff', bg: 'rgba(51, 102, 255, 0.08)', icon: '⚡', desc: 'Acesso total ao painel admin' },
+];
+
+const RoleModal = ({ isOpen, username, avatar, currentRole, onConfirm, onCancel }) => {
+    const [selected, setSelected] = useState(currentRole);
+    if (!isOpen) return null;
+    return (
+        <div style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(14px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002,
+            animation: 'fadeIn 0.2s ease'
+        }} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+            <div style={{
+                background: 'linear-gradient(135deg, #0d1525 0%, #0a0f1e 100%)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '30px', padding: '40px', width: '90%', maxWidth: '460px',
+                boxShadow: '0 50px 100px -20px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
+                animation: 'pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}>
+                {/* User header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '28px' }}>
+                    <img src={avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'} style={{ width: '52px', height: '52px', borderRadius: '16px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)' }} />
+                    <div>
+                        <p style={{ margin: 0, fontWeight: '950', fontSize: '1.1rem' }}>{username}</p>
+                        <p style={{ margin: 0, fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '3px' }}>Alterar cargo de acesso</p>
+                    </div>
+                </div>
+
+                {/* Role options */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
+                    {ROLES.map(r => (
+                        <button
+                            key={r.value}
+                            onClick={() => setSelected(r.value)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '16px',
+                                padding: '16px 20px', borderRadius: '16px',
+                                background: selected === r.value ? r.bg : 'rgba(255,255,255,0.02)',
+                                border: `1px solid ${selected === r.value ? r.color + '44' : 'rgba(255,255,255,0.05)'}`,
+                                cursor: 'pointer', textAlign: 'left', transition: '0.2s',
+                                boxShadow: selected === r.value ? `0 0 0 3px ${r.color}15` : 'none',
+                            }}
+                        >
+                            <span style={{ fontSize: '1.4rem' }}>{r.icon}</span>
+                            <div style={{ flex: 1 }}>
+                                <p style={{ margin: 0, fontWeight: '950', fontSize: '0.85rem', color: selected === r.value ? r.color : '#fff' }}>{r.label}</p>
+                                <p style={{ margin: 0, fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{r.desc}</p>
+                            </div>
+                            {currentRole === r.value && (
+                                <span style={{ fontSize: '0.55rem', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '20px', color: 'rgba(255,255,255,0.3)', fontWeight: '900', letterSpacing: '1px' }}>ATUAL</span>
+                            )}
+                            {selected === r.value && (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={r.color} strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Buttons */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button onClick={onCancel} style={{ flex: 1, padding: '15px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.07)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontWeight: '800', cursor: 'pointer', fontSize: '0.8rem', letterSpacing: '1px', transition: '0.2s' }}>
+                        CANCELAR
+                    </button>
+                    <button
+                        onClick={() => { if (selected !== currentRole) onConfirm(selected); else onCancel(); }}
+                        style={{
+                            flex: 2, padding: '15px', borderRadius: '14px', border: 'none',
+                            background: selected !== currentRole
+                                ? `linear-gradient(135deg, ${ROLES.find(r => r.value === selected)?.color}, ${ROLES.find(r => r.value === selected)?.color}bb)`
+                                : 'rgba(255,255,255,0.05)',
+                            color: selected !== currentRole ? '#fff' : 'rgba(255,255,255,0.2)',
+                            fontWeight: '950', cursor: 'pointer', fontSize: '0.85rem', letterSpacing: '1px',
+                            boxShadow: selected !== currentRole ? `0 8px 20px -5px ${ROLES.find(r => r.value === selected)?.color}55` : 'none',
+                            transition: '0.3s'
+                        }}
+                    >
+                        CONFIRMAR CARGO
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const AdminPage = () => {
-    const { isAdmin, loading: authLoading } = useAuth()
+    const { user, isAdmin, loading: authLoading } = useAuth()
+    const CEO_ID = '1249488594414997676'
+    const isOwner = user?.discord_id === CEO_ID
     const [activeTab, setActiveTab] = useState('dashboard')
     const [notification, setNotification] = useState(null)
     const notify = (msg, type = 'success') => setNotification({ msg, type })
@@ -132,9 +430,11 @@ const AdminPage = () => {
     const [licenses, setLicenses] = useState([])
     const [moderators, setModerators] = useState([])
     const [logs, setLogs] = useState([])
+    const [users, setUsers] = useState([])
+    const [userSearch, setUserSearch] = useState('')
 
     const [newCatName, setNewCatName] = useState('')
-    const [newProduct, setNewProduct] = useState({ name: '', description: '', category_id: '', image_url: '' })
+    const [newProduct, setNewProduct] = useState({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
     const [newPlan, setNewPlan] = useState({ product_id: '', name: '', duration_days: 0, price: 0 })
     const [newLicense, setNewLicense] = useState({ discord_id: '', product_id: '', plan_id: '', duration_days: 0 })
     const [newModId, setNewModId] = useState('')
@@ -150,6 +450,15 @@ const AdminPage = () => {
     const askConfirm = (title, message, confirmText, action) => {
         setConfirmConfig({ isOpen: true, title, message, confirmText, onConfirm: () => { action(); setConfirmConfig(prev => ({ ...prev, isOpen: false })) } })
     }
+
+    const [inputConfig, setInputConfig] = useState({ isOpen: false, title: '', subtitle: '', accentColor: '#22c55e', confirmText: 'CONFIRMAR', onConfirm: () => { } })
+    const askInput = (title, subtitle, accentColor, confirmText, onConfirm) => {
+        setInputConfig({ isOpen: true, title, subtitle, accentColor, confirmText, onConfirm: (val) => { onConfirm(val); setInputConfig(prev => ({ ...prev, isOpen: false })) } })
+    }
+
+    const [roleModal, setRoleModal] = useState({ isOpen: false, user: null })
+    const openRoleModal = (user) => setRoleModal({ isOpen: true, user })
+    const closeRoleModal = () => setRoleModal({ isOpen: false, user: null })
 
     useEffect(() => { if (isAdmin) refreshData() }, [isAdmin, activeTab])
 
@@ -184,6 +493,9 @@ const AdminPage = () => {
     const fetchVersions = async () => {
         try { const res = await axios.get(`${API_URL}/api/admin/versions`, { withCredentials: true }); setVersionList(res.data) } catch (e) { }
     }
+    const fetchUsers = async () => {
+        try { const res = await axios.get(`${API_URL}/api/admin/users`, { withCredentials: true }); setUsers(res.data) } catch (e) { }
+    }
 
 
     const refreshData = async () => {
@@ -195,6 +507,7 @@ const AdminPage = () => {
         await fetchNews();
         await fetchSettings();
         if (activeTab === 'updates') await fetchVersions();
+        if (activeTab === 'users' || activeTab === 'resellers') await fetchUsers();
         await fetchLogs();
     }
 
@@ -235,7 +548,7 @@ const AdminPage = () => {
         e.preventDefault()
         try {
             await axios.post(`${API_URL}/api/admin/products`, newProduct, { withCredentials: true })
-            setNewProduct({ name: '', description: '', category_id: '', image_url: '' })
+            setNewProduct({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '' })
             fetchProducts(); notify('PRODUTO LANÇADO COM SUCESSO!')
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
     }
@@ -326,6 +639,22 @@ const AdminPage = () => {
             <Navbar />
             {notification && <Notification message={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
             <ConfirmModal {...confirmConfig} onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} />
+            <InputModal {...inputConfig} onCancel={() => setInputConfig(prev => ({ ...prev, isOpen: false }))} />
+            <RoleModal
+                isOpen={roleModal.isOpen}
+                username={roleModal.user?.username}
+                avatar={roleModal.user?.avatar}
+                currentRole={roleModal.user?.role || 'user'}
+                onCancel={closeRoleModal}
+                onConfirm={async (newRole) => {
+                    try {
+                        await axios.patch(`${API_URL}/api/admin/users/${roleModal.user?.id}/role`, { role: newRole }, { withCredentials: true });
+                        notify(`CARGO ALTERADO PARA ${newRole.toUpperCase()}!`);
+                        closeRoleModal();
+                        fetchUsers();
+                    } catch (err) { notify(err.response?.data?.error || 'Erro ao alterar cargo', 'error'); }
+                }}
+            />
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', overflowX: 'auto' }}>
@@ -337,6 +666,8 @@ const AdminPage = () => {
                         ['updates', 'VERSIONS'],
                         ['news', 'NOTICES'],
                         ['settings', 'COMMUNITY'],
+                        ...(isOwner ? [['resellers', 'REVENDA 👑']] : []),
+                        ['users', 'USUÁRIOS'],
                         ['moderators', 'ACCESS'],
                         ['logs', 'LOGS TÁTICOS']
                     ].map(([tab, label]) => (
@@ -345,6 +676,306 @@ const AdminPage = () => {
                         </button>
                     ))}
                 </div>
+
+                {activeTab === 'resellers' && isOwner && (() => {
+                    const resellers = users.filter(u => u.role === 'reseller');
+                    return (
+                        <div>
+                            {/* Header */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                        <div style={{ width: '4px', height: '28px', background: 'linear-gradient(180deg, #22c55e, #16a34a)', borderRadius: '2px' }} />
+                                        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '950', letterSpacing: '-0.5px' }}>Rede de Revendedores</h2>
+                                    </div>
+                                    <p style={{ margin: 0, marginLeft: '16px', color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem' }}>
+                                        {resellers.length} revendedor{resellers.length !== 1 ? 'es' : ''} ativos · Total em caixa: <span style={{ color: '#22c55e', fontWeight: '800' }}>R$ {resellers.reduce((a, u) => a + (u.reseller_balance || 0), 0).toFixed(2)}</span>
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={fetchUsers}
+                                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', padding: '10px 18px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '800', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4v6h6M23 20v-6h-6" /><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" /></svg>
+                                    ATUALIZAR
+                                </button>
+                            </div>
+
+                            {resellers.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '80px 20px', background: 'rgba(255,255,255,0.01)', borderRadius: '28px', border: '1px dashed rgba(255,255,255,0.06)' }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.3 }}>💹</div>
+                                    <p style={{ margin: 0, fontWeight: '800', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>Nenhum revendedor ainda</p>
+                                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.15)', fontSize: '0.75rem', marginTop: '6px' }}>Acesse a aba USUÁRIOS e promova alguém para <strong>RESELLER</strong></p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                                    {resellers.map(u => (
+                                        <div key={u.id} style={{
+                                            background: 'rgba(255,255,255,0.02)',
+                                            border: '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '24px',
+                                            padding: '24px',
+                                            transition: '0.2s',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                        }}
+                                            onMouseOver={e => e.currentTarget.style.borderColor = 'rgba(34,197,94,0.2)'}
+                                            onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}
+                                        >
+                                            {/* subtle green glow top */}
+                                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(34,197,94,0.3), transparent)' }} />
+
+                                            {/* User info */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                                                <div style={{ position: 'relative' }}>
+                                                    <img
+                                                        src={u.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}
+                                                        style={{ width: '48px', height: '48px', borderRadius: '16px', objectFit: 'cover', border: '2px solid rgba(34,197,94,0.3)' }}
+                                                        alt=""
+                                                    />
+                                                    <div style={{ position: 'absolute', bottom: '-3px', right: '-3px', width: '14px', height: '14px', background: '#22c55e', borderRadius: '50%', border: '2px solid #080c14' }} />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{ margin: 0, fontWeight: '950', fontSize: '0.95rem' }}>{u.username}</p>
+                                                    <p style={{ margin: 0, fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', marginTop: '3px' }}>{u.discord_id}</p>
+                                                </div>
+                                                <span style={{ fontSize: '0.58rem', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)', padding: '4px 10px', borderRadius: '20px', fontWeight: '900', letterSpacing: '0.5px' }}>RESELLER</span>
+                                            </div>
+
+                                            {/* Balance display */}
+                                            <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)', borderRadius: '16px', padding: '16px 20px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)', fontWeight: '900', letterSpacing: '1.5px', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
+                                                    <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: '950', color: u.reseller_balance > 0 ? '#22c55e' : 'rgba(255,255,255,0.2)', letterSpacing: '-1px', lineHeight: 1 }}>
+                                                        R$ {(u.reseller_balance || 0).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="1.5" opacity="0.3"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button
+                                                    onClick={() => askInput(
+                                                        'ADICIONAR SALDO',
+                                                        `${u.username} · Saldo atual: R$ ${(u.reseller_balance || 0).toFixed(2)}`,
+                                                        '#22c55e', 'ADICIONAR',
+                                                        async (amount) => {
+                                                            try {
+                                                                await axios.post(`${API_URL}/api/admin/users/${u.id}/reseller-balance`, { amount }, { withCredentials: true });
+                                                                notify('SALDO ADICIONADO!'); fetchUsers();
+                                                            } catch (err) { notify('Erro', 'error'); }
+                                                        }
+                                                    )}
+                                                    style={{ flex: 1, padding: '11px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', color: '#22c55e', fontWeight: '900', cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.5px', transition: '0.2s' }}
+                                                    onMouseOver={e => e.currentTarget.style.background = 'rgba(34,197,94,0.15)'}
+                                                    onMouseOut={e => e.currentTarget.style.background = 'rgba(34,197,94,0.08)'}
+                                                >
+                                                    + ADICIONAR
+                                                </button>
+                                                <button
+                                                    onClick={() => askInput(
+                                                        'DEFINIR SALDO',
+                                                        `${u.username} · Definir valor exato`,
+                                                        '#3366ff', 'DEFINIR',
+                                                        async (amount) => {
+                                                            try {
+                                                                await axios.post(`${API_URL}/api/admin/users/${u.id}/set-reseller-balance`, { amount }, { withCredentials: true });
+                                                                notify('SALDO DEFINIDO!'); fetchUsers();
+                                                            } catch (err) { notify('Erro', 'error'); }
+                                                        }
+                                                    )}
+                                                    style={{ flex: 1, padding: '11px', background: 'rgba(51,102,255,0.08)', border: '1px solid rgba(51,102,255,0.2)', borderRadius: '12px', color: '#3366ff', fontWeight: '900', cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.5px', transition: '0.2s' }}
+                                                    onMouseOver={e => e.currentTarget.style.background = 'rgba(51,102,255,0.15)'}
+                                                    onMouseOut={e => e.currentTarget.style.background = 'rgba(51,102,255,0.08)'}
+                                                >
+                                                    ≡ DEFINIR
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
+                        <div style={{ borderLeft: '4px solid #22c55e', paddingLeft: '20px' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>GERENCIAMENTO DE REVENDEDORES</h2>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Visualize e controle o saldo de crédito dos seus revendedores oficiais.</p>
+                        </div>
+                    </div>
+
+                    <div className="glass" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ background: 'rgba(255,255,255,0.02)', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}>
+                                <tr>
+                                    <th style={{ padding: '25px' }}>REVENDEDOR</th>
+                                    <th>DISCORD ID</th>
+                                    <th>SALDO ATUAL</th>
+                                    <th style={{ padding: '25px', textAlign: 'right' }}>AÇÕES</th>
+                                </tr>
+                            </thead>
+                            <tbody style={{ fontSize: '0.85rem', fontWeight: '700' }}>
+                                {users.filter(u => u.role === 'reseller').map(u => (
+                                    <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <td style={{ padding: '20px 25px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                            <img src={u.avatar} style={{ width: '40px', height: '40px', borderRadius: '12px' }} />
+                                            {u.username}
+                                        </td>
+                                        <td style={{ opacity: 0.4 }}>{u.discord_id}</td>
+                                        <td style={{ color: '#22c55e', fontWeight: '900' }}>R$ {u.reseller_balance?.toFixed(2)}</td>
+                                        <td style={{ padding: '20px 25px', textAlign: 'right' }}>
+                                            <button
+                                                onClick={() => {
+                                                    askInput(
+                                                        'DEFINIR SALDO',
+                                                        `Revendedor: ${u.username} | Saldo atual: R$ ${u.reseller_balance?.toFixed(2)}`,
+                                                        '#22c55e',
+                                                        'DEFINIR SALDO',
+                                                        async (amount) => {
+                                                            try {
+                                                                await axios.post(`${API_URL}/api/admin/users/${u.id}/set-reseller-balance`, { amount }, { withCredentials: true });
+                                                                notify('SALDO DEFINIDO!'); fetchUsers();
+                                                            } catch (err) { notify('Erro ao definir saldo', 'error'); }
+                                                        }
+                                                    );
+                                                }}
+                                                className="btn-primary"
+                                                style={{ padding: '8px 20px', fontSize: '0.7rem', background: '#22c55e' }}
+                                            >
+                                                SET SALDO
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {users.filter(u => u.role === 'reseller').length === 0 && (
+                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', opacity: 0.3 }}>Nenhum revendedor cadastrado. Promova alguém na aba USUÁRIOS.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                )}
+
+                {activeTab === 'users' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
+                            <div style={{ borderLeft: '4px solid #3366ff', paddingLeft: '20px' }}>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>GERENCIAMENTO DE USUÁRIOS & REVENDA</h2>
+                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Gerencie permissões, cargos de revendedores e adicione saldo para geração de stock.</p>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Procurar Usuário / ID..."
+                                    value={userSearch}
+                                    onChange={(e) => setUserSearch(e.target.value)}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.02)',
+                                        border: '1px solid rgba(255,255,255,0.05)',
+                                        padding: '12px 20px',
+                                        borderRadius: '12px',
+                                        color: '#fff',
+                                        fontSize: '0.8rem',
+                                        width: '250px',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <svg style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', opacity: 0.2 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                            </div>
+                        </div>
+
+                        <div className="glass" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead style={{ background: 'rgba(255,255,255,0.02)', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}>
+                                    <tr>
+                                        <th style={{ padding: '25px' }}>USUÁRIO</th>
+                                        <th>DISCORD ID</th>
+                                        <th>CARGO</th>
+                                        <th>SALDO REVENDA</th>
+                                        <th style={{ padding: '25px', textAlign: 'right' }}>AÇÕES</th>
+                                    </tr>
+                                </thead>
+                                <tbody style={{ fontSize: '0.85rem', fontWeight: '700' }}>
+                                    {users.filter(u =>
+                                        (u.username?.toLowerCase().includes(userSearch.toLowerCase()) || u.discord_id?.includes(userSearch))
+                                    ).map(u => (
+                                        <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.03)', transition: '0.2s' }} className="hover-row">
+                                            <td style={{ padding: '20px 25px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                <img src={u.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'} style={{ width: '40px', height: '40px', borderRadius: '14px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.05)' }} alt="" />
+                                                <div>
+                                                    <p style={{ margin: 0, fontWeight: '800' }}>{u.username}</p>
+                                                    <p style={{ margin: 0, fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>#{u.id}</p>
+                                                </div>
+                                            </td>
+                                            <td style={{ opacity: 0.5, fontSize: '0.8rem', fontFamily: 'monospace' }}>{u.discord_id}</td>
+                                            <td>
+                                                <button
+                                                    onClick={() => openRoleModal(u)}
+                                                    style={{
+                                                        background: u.role === 'admin' ? 'rgba(51, 102, 255, 0.12)' : u.role === 'reseller' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255,255,255,0.05)',
+                                                        border: `1px solid ${u.role === 'admin' ? 'rgba(51,102,255,0.3)' : u.role === 'reseller' ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                                                        padding: '7px 14px',
+                                                        borderRadius: '10px',
+                                                        color: u.role === 'admin' ? '#3366ff' : u.role === 'reseller' ? '#22c55e' : 'rgba(255,255,255,0.6)',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: '900',
+                                                        cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        transition: '0.2s',
+                                                        letterSpacing: '0.5px'
+                                                    }}
+                                                    onMouseOver={e => e.currentTarget.style.opacity = '0.75'}
+                                                    onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                                                >
+                                                    {u.role === 'admin' ? '⚡' : u.role === 'reseller' ? '💹' : '👤'}
+                                                    {(u.role || 'user').toUpperCase()}
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6" /></svg>
+                                                </button>
+                                            </td>
+                                            <td style={{ fontWeight: '900' }}>
+                                                <span style={{ color: u.reseller_balance > 0 ? '#22c55e' : 'rgba(255,255,255,0.2)' }}>R$ {u.reseller_balance?.toFixed(2) || '0.00'}</span>
+                                            </td>
+                                            <td style={{ padding: '20px 25px', textAlign: 'right' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        askInput(
+                                                            'ADICIONAR SALDO',
+                                                            `${u.username} | Saldo atual: R$ ${u.reseller_balance?.toFixed(2) || '0.00'}`,
+                                                            '#22c55e',
+                                                            'ADICIONAR',
+                                                            async (amount) => {
+                                                                try {
+                                                                    await axios.post(`${API_URL}/api/admin/users/${u.id}/reseller-balance`, { amount }, { withCredentials: true });
+                                                                    notify('SALDO ADICIONADO!'); fetchUsers();
+                                                                } catch (err) { notify(err.response?.data?.error || 'Erro', 'error'); }
+                                                            }
+                                                        );
+                                                    }}
+                                                    style={{
+                                                        background: 'linear-gradient(to right, #22c55e, #16a34a)',
+                                                        border: 'none',
+                                                        color: '#fff',
+                                                        padding: '10px 18px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: '950',
+                                                        cursor: 'pointer',
+                                                        boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+                                                    }}
+                                                >
+                                                    + SALDO
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 {activeTab === 'updates' && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
@@ -454,7 +1085,7 @@ const AdminPage = () => {
                                         <span style={{ fontSize: '0.65rem', fontWeight: '950', color: '#3b82f6', background: 'rgba(59,130,246,0.1)', padding: '6px 14px', borderRadius: '12px' }}>{stats.monthlySales} VENDAS NO MÊS</span>
                                     </div>
                                 </div>
-                                <ActivityChart data={stats.chartData} />
+                                <ActivityChart data={stats.chartData} label="licenças geradas" />
                             </div>
 
                             <div className="glass" style={{ padding: '2.5rem', borderRadius: '45px' }}>
@@ -493,6 +1124,17 @@ const AdminPage = () => {
                                         </select>
                                     </div>
                                     <input type="text" placeholder="URL da Imagem de Capa" value={newProduct.image_url} onChange={e => setNewProduct({ ...newProduct, image_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                    <select value={newProduct.status} onChange={e => setNewProduct({ ...newProduct, status: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                        <option value="UNDETECTED">UNDETECTED</option>
+                                        <option value="MAINTENANCE">MAINTENANCE</option>
+                                        <option value="TESTING">TESTING</option>
+                                        <option value="DETECTED">DETECTED</option>
+                                    </select>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                                        <input type="text" placeholder="Versão (ex: 1.0.2)" value={newProduct.current_version} onChange={e => setNewProduct({ ...newProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
+                                        <input type="text" placeholder="URL Direta de Download (.exe / .zip)" value={newProduct.download_url} onChange={e => setNewProduct({ ...newProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                    </div>
+                                    <textarea placeholder="Changelog / Notas da Versão" value={newProduct.changelog} onChange={e => setNewProduct({ ...newProduct, changelog: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '80px', resize: 'vertical' }} />
                                     <button type="submit" className="btn-primary" style={{ height: '55px', borderRadius: '18px', fontWeight: '950' }}>PUBLICAR SOFTWARE</button>
                                 </form>
                             </div>
@@ -519,8 +1161,19 @@ const AdminPage = () => {
                                     <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '25px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
                                             <div>
-                                                <span style={{ fontWeight: '950', fontSize: '1.2rem', color: '#3b82f6' }}>{p.name.toUpperCase()}</span>
-                                                <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '950', opacity: 0.3, letterSpacing: '2px', marginTop: '4px' }}>{p.category_name || 'NO CATEGORY'}</p>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <span style={{ fontWeight: '950', fontSize: '1.2rem', color: '#3b82f6' }}>{p.name.toUpperCase()}</span>
+                                                    <span style={{
+                                                        fontSize: '0.6rem',
+                                                        fontWeight: '900',
+                                                        background: p.status === 'UNDETECTED' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                        color: p.status === 'UNDETECTED' ? '#22c55e' : '#ef4444',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '4px'
+                                                    }}>{p.status}</span>
+                                                </div>
+                                                <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '950', opacity: 0.3, letterSpacing: '2px', marginTop: '4px' }}>{p.category_name || 'NO CATEGORY'} • v{p.current_version || '1.0.0'}</p>
+                                                {p.changelog && <p style={{ margin: 0, fontSize: '0.6rem', color: '#3b82f6', marginTop: '5px', cursor: 'pointer' }} onClick={() => alert(`CHANGELOG v${p.current_version}:\n\n${p.changelog}`)}>VER NOTAS DA VERSÃO</p>}
                                             </div>
                                             <button onClick={() => handleDeleteProduct(p.id)} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: 'none', cursor: 'pointer', padding: '8px 15px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '950' }}>DELETAR</button>
                                         </div>
@@ -556,6 +1209,68 @@ const AdminPage = () => {
                                     <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '18px', background: 'rgba(255,255,255,0.02)', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <span style={{ fontWeight: '950', fontSize: '0.9rem' }}>{c.name.toUpperCase()}</span>
                                         <button onClick={() => handleDeleteCategory(c.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '950' }}>REVOGAR</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'updates' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2.5rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%)' }}>
+                                <h3 style={{ marginBottom: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>LAUNCHER UPDATER</h3>
+                                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginBottom: '1.5rem' }}>Configure a versão global do launcher para forçar a atualização automática em todos os usuários.</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', fontWeight: '900', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>VERSÃO ATUAL DO LAUNCHER</label>
+                                        <input
+                                            type="text"
+                                            value={localSettings.launcher_version || ''}
+                                            onChange={e => setLocalSettings({ ...localSettings, launcher_version: e.target.value })}
+                                            placeholder="ex: 1.5.0"
+                                            style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', fontWeight: '900', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>LINK DE DOWNLOAD DO NOVO .EXE</label>
+                                        <input
+                                            type="text"
+                                            value={localSettings.launcher_download_url || ''}
+                                            onChange={e => setLocalSettings({ ...localSettings, launcher_download_url: e.target.value })}
+                                            placeholder="https://..."
+                                            style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            handleUpdateSetting('launcher_version', localSettings.launcher_version);
+                                            handleUpdateSetting('launcher_download_url', localSettings.launcher_download_url);
+                                            notify('SISTEMA DE AUTO-UPDATE ATUALIZADO!');
+                                        }}
+                                        className="btn-primary"
+                                        style={{ height: '50px', borderRadius: '15px', marginTop: '10px' }}
+                                    >
+                                        SALVAR CONFIGURAÇÃO
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
+                            <h3 style={{ marginBottom: '2rem', fontWeight: '950' }}>HISTÓRICO DE UPDATES DE SOFTWARES</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {products.map(p => (
+                                    <div key={p.id} style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <p style={{ margin: 0, fontWeight: '950', fontSize: '0.9rem' }}>{p.name.toUpperCase()}</p>
+                                            <p style={{ margin: 0, fontSize: '0.7rem', color: '#3b82f6' }}>Versão Atual: v{p.current_version}</p>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <p style={{ margin: 0, fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginBottom: '5px' }}>STATUS: {p.status}</p>
+                                            {p.download_url && <span style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.05)', padding: '5px 10px', borderRadius: '5px' }}>🔗 LINK VINCULADO</span>}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -688,7 +1403,9 @@ const AdminPage = () => {
                                     { key: 'stats_uptime', label: 'UPTIME DO SISTEMA (%)', type: 'text' },
                                     { key: 'stats_detection', label: 'TAXA DE DETECÇÃO (%)', type: 'text' },
                                     { key: 'stats_delivery', label: 'TAXA DE ENTREGA (%)', type: 'text' },
-                                    { key: 'discord_link', label: 'LINK DO DISCORD', type: 'text' }
+                                    { key: 'discord_link', label: 'LINK DO DISCORD', type: 'text' },
+                                    { key: 'broadcast_message', label: 'MENSAGEM DO LAUNCHER (BROADCAST)', type: 'text' },
+                                    { key: 'launcher_integrity_hash', label: 'HASH DE INTEGRIDADE DO EXE (SHA256)', type: 'text' }
                                 ].map(s => (
                                     <div key={s.key}>
                                         <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', marginBottom: '10px', letterSpacing: '1px' }}>{s.label}</label>

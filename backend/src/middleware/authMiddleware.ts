@@ -40,3 +40,17 @@ export const verifyBotToken = (req: Request, res: Response, next: NextFunction) 
     }
     next();
 };
+
+export const verifyReseller = (req: any, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
+
+    // Check if user is reseller OR admin (admins can always access reseller panel)
+    const isAdmin = User.isAdmin(req.user.discord_id);
+    const isReseller = req.user.role === 'reseller' || req.user.role === 'admin' || isAdmin;
+
+    if (!isReseller) {
+        return res.status(403).json({ error: 'Permission denied. Resellers only.' });
+    }
+
+    next();
+};

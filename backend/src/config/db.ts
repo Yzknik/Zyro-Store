@@ -24,8 +24,23 @@ const initSchema = () => {
             username TEXT NOT NULL,
             avatar TEXT,
             password TEXT DEFAULT NULL,
+            role TEXT DEFAULT 'user',
+            reseller_balance REAL DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_login DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS reseller_sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reseller_id INTEGER,
+            product_id INTEGER,
+            plan_id INTEGER,
+            license_key TEXT NOT NULL,
+            price_charged REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (reseller_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS admin_whitelist (
@@ -86,6 +101,46 @@ const initSchema = () => {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS user_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            product_id INTEGER,
+            config_name TEXT NOT NULL,
+            config_json TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS login_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            ip_address TEXT,
+            hwid TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            subject TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS ticket_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER,
+            user_id INTEGER,
+            message TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -107,7 +162,9 @@ const initSchema = () => {
         ['stats_uptime', '99.9%'],
         ['stats_detection', '0%'],
         ['stats_delivery', '100%'],
-        ['discord_link', 'https://discord.gg/zyrostore']
+        ['discord_link', 'https://discord.gg/zyrostore'],
+        ['broadcast_message', 'Bem-vindo ao Zyro Store Launcher! Aproveite nossas ofertas.'],
+        ['launcher_integrity_hash', 'ZYRO-HASH-123-ABC']
     ];
 
     for (const [key, val] of defaultSettings) {
@@ -118,16 +175,26 @@ const initSchema = () => {
     const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
     if (usersCount.count === 0) {
         db.prepare("INSERT INTO users (discord_id, username, avatar) VALUES ('1249488594414997676', 'ZyroOwner', 'https://cdn.discordapp.com/embed/avatars/0.png')").run();
-        db.prepare("INSERT INTO products (name, description, image_url) VALUES ('FIVEM EXTERNAL', 'High-end performance external for FiveM.', 'https://placehold.co/600x400/080c14/3366ff?text=FIVEM')").run();
-        db.prepare("INSERT INTO products (name, description, image_url) VALUES ('CS2 INTERNAL', 'Precision internal software for CS2.', 'https://placehold.co/600x400/080c14/3366ff?text=CS2')").run();
+        db.prepare("INSERT INTO products (name, description, image_url, status) VALUES ('FIVEM EXTERNAL', 'High-end performance external for FiveM.', 'https://placehold.co/600x400/080c14/3366ff?text=FIVEM', 'UNDETECTED')").run();
+        db.prepare("INSERT INTO products (name, description, image_url, status) VALUES ('CS2 INTERNAL', 'Precision internal software for CS2.', 'https://placehold.co/600x400/080c14/3366ff?text=CS2', 'UNDETECTED')").run();
     }
 
     // Migrations
     try { db.prepare('ALTER TABLE users ADD COLUMN password TEXT DEFAULT NULL').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE users ADD COLUMN discord_access_token TEXT DEFAULT NULL').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN last_ip TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN last_heartbeat DATETIME').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN category_id INTEGER').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN image_url TEXT').run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN status TEXT DEFAULT 'UNDETECTED'").run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN integrity_hash TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE user_products ADD COLUMN plan_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE user_products ADD COLUMN hwid_reset_at DATETIME').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN role TEXT DEFAULT "user"').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN reseller_balance REAL DEFAULT 0').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN current_version TEXT DEFAULT "1.0.0"').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN download_url TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN changelog TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN product_id INTEGER').run(); } catch (e) { }
 
     console.log('✅ SQLite Database Initialized with System Logs');

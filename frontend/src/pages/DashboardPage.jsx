@@ -17,10 +17,16 @@ const DashboardPage = () => {
 
     const [news, setNews] = useState([])
     const [settings, setSettings] = useState({})
+    const [history, setHistory] = useState([])
+    const [tickets, setTickets] = useState([])
+    const [configs, setConfigs] = useState([])
+    const [selectedConfigProduct, setSelectedConfigProduct] = useState(null)
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
         fetchInfo()
+        fetchHistory()
+        fetchTickets()
         return () => clearInterval(timer)
     }, [])
 
@@ -32,13 +38,38 @@ const DashboardPage = () => {
         } catch (e) { console.error('Error fetching dashboard info', e) }
     }
 
+    const fetchHistory = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/auth/history`, { withCredentials: true })
+            setHistory(res.data || [])
+        } catch (e) { }
+    }
+
+    const fetchTickets = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/tickets/my`, { withCredentials: true })
+            setTickets(res.data || [])
+        } catch (e) { }
+    }
+
+    const fetchConfigs = async (productId) => {
+        try {
+            const res = await axios.get(`${API_URL}/api/auth/configs/${productId}`, { withCredentials: true })
+            setConfigs(res.data || [])
+            setSelectedConfigProduct(productId)
+        } catch (e) { }
+    }
+
     const handleResetHWID = async (productId) => {
         if (!confirm('Deseja realmente resetar seu Hardware ID?')) return
         try {
             setResetting(productId)
-            await axios.post(`${API_URL}/api/auth/hwid/reset`, { product_id: productId }, { withCredentials: true })
+            const res = await axios.post(`${API_URL}/api/auth/hwid/reset`, { product_id: productId }, { withCredentials: true })
+            alert(res.data.message || 'HWID resetado com sucesso.')
             await checkAuth()
-        } catch (err) { } finally { setResetting(null) }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Erro ao resetar HWID.')
+        } finally { setResetting(null) }
     }
 
     const handleToggleStatus = async (licenseId) => {
@@ -99,7 +130,9 @@ const DashboardPage = () => {
                         {[
                             { id: 'overview', label: 'Overview' },
                             { id: 'licenses', label: 'My Products' },
-                            { id: 'security', label: 'HWID Config' }
+                            { id: 'configs', label: 'Cloud Configs' },
+                            { id: 'security', label: 'HWID & History' },
+                            { id: 'tickets', label: 'Support Tickets' }
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -120,6 +153,25 @@ const DashboardPage = () => {
                                 {tab.label}
                             </button>
                         ))}
+
+                        {(user.role === 'reseller' || isAdmin || isCEO) && (
+                            <Link to="/reseller" style={{
+                                marginTop: '10px',
+                                textAlign: 'left',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                background: 'rgba(34, 197, 94, 0.05)',
+                                color: '#22c55e',
+                                textDecoration: 'none',
+                                fontSize: '0.8rem',
+                                fontWeight: '900',
+                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                                transition: '0.3s',
+                                letterSpacing: '1px'
+                            }}>
+                                RESELLER HUB
+                            </Link>
+                        )}
                         {isAdmin && (
                             <Link to="/admin" style={{ textDecoration: 'none', marginTop: '20px' }}>
                                 <div style={{
@@ -159,18 +211,6 @@ const DashboardPage = () => {
                                     </div>
                                 </div>
 
-                                {/* Detailed Ecosystem Stats */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '20px' }}>
-                                    {[
-                                        { label: 'DISCORD MEMBROS', value: settings.discord_members_count || 0, color: '#5865F2' }
-                                    ].map((s, i) => (
-                                        <div key={i} className="card" style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
-                                            <p style={{ fontSize: '0.6rem', fontWeight: '900', color: 'rgba(255,255,255,0.2)', marginBottom: '4px', letterSpacing: '0.1em' }}>{s.label}</p>
-                                            <h4 style={{ fontSize: '1.2rem', fontWeight: '950', color: s.color || '#fff' }}>{s.value}</h4>
-                                        </div>
-                                    ))}
-                                </div>
-
                                 {/* Platform Support Row */}
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px', width: '100%' }}>
 
@@ -204,7 +244,7 @@ const DashboardPage = () => {
                                         <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '20px' }}>Live Status</h4>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                             {[
-                                                { label: 'Users Active', value: settings.stats_active_users || '...' },
+                                                { label: 'Discord Members', value: settings.discord_members_count || '...' },
                                                 { label: 'System Uptime', value: settings.stats_uptime || '...' },
                                                 { label: 'Detection Rate', value: settings.stats_detection || '...' },
                                                 { label: 'Instant Delivery', value: settings.stats_delivery || '...' }
@@ -222,18 +262,6 @@ const DashboardPage = () => {
                                                 </div>
                                             ))}
                                         </div>
-                                        <a
-                                            href={settings.discord_link || 'https://discord.gg/zyrostore'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{ textDecoration: 'none' }}
-                                        >
-                                            <div style={{ marginTop: '30px', padding: '15px', background: 'rgba(51, 102, 255, 0.05)', borderRadius: '6px', border: '1px solid rgba(51, 102, 255, 0.1)', transition: '0.2s', textAlign: 'center' }} className="hover-glow">
-                                                <p style={{ fontSize: '0.75rem', color: '#fff', fontWeight: '700' }}>
-                                                    JOIN OUR DISCORD COMMUNITY
-                                                </p>
-                                            </div>
-                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -244,8 +272,11 @@ const DashboardPage = () => {
                                 {userProducts?.map((p, idx) => (
                                     <div key={idx} className="card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div>
-                                            <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>{p.name}</h3>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>{p.name}</h3>
+                                                <span style={{ fontSize: '0.65rem', fontWeight: '900', color: '#3366ff', background: 'rgba(51,102,255,0.1)', padding: '2px 8px', borderRadius: '4px' }}>v{p.current_version || '1.0.0'}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
                                                 <code style={{
                                                     background: 'rgba(255,255,255,0.03)',
                                                     padding: '4px 10px',
@@ -258,13 +289,22 @@ const DashboardPage = () => {
                                                 </code>
                                                 <button
                                                     onClick={() => setShowKeys(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                                                    style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+                                                    style={{ background: 'none', border: 'none', color: '#3366ff', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
                                                 >
                                                     {showKeys[idx] ? 'Hide' : 'Show'}
                                                 </button>
                                             </div>
+                                            {p.changelog && (
+                                                <button
+                                                    onClick={() => alert(`NOTAS DA VERSÃO v${p.current_version}:\n\n${p.changelog}`)}
+                                                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                                                >
+                                                    O QUE HÁ DE NOVO?
+                                                </button>
+                                            )}
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: '800', color: p.status === 'active' ? '#22c55e' : '#ef4444', background: p.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '4px 8px', borderRadius: '4px', marginBottom: '10px', display: 'inline-block' }}>{p.status.toUpperCase()}</span>
                                             <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginBottom: '4px' }}>EXPIRATION</p>
                                             <p style={{ fontSize: '0.9rem', fontWeight: '600', color: p.expires_at ? '#fff' : '#22c55e' }}>
                                                 {p.expires_at ? new Date(p.expires_at).toLocaleDateString() : 'LIFETIME'}
@@ -280,35 +320,127 @@ const DashboardPage = () => {
                             </div>
                         )}
 
-                        {activeTab === 'security' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {userProducts?.map((p, idx) => (
-                                    <div key={idx} className="card" style={{ padding: '24px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                            <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>{p.name}</h3>
-                                            {p.hwid && !isCEO && (
-                                                <button
-                                                    onClick={() => handleResetHWID(p.product_id)}
-                                                    disabled={resetting === p.product_id}
-                                                    className="btn-outline"
-                                                    style={{ padding: '8px 20px', fontSize: '0.8rem' }}
-                                                >
-                                                    {resetting === p.product_id ? 'WAIT...' : 'RESET HWID'}
-                                                </button>
-                                            )}
+                        {activeTab === 'configs' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
+                                    {userProducts?.map((p, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => fetchConfigs(p.product_id)}
+                                            style={{
+                                                padding: '15px',
+                                                background: selectedConfigProduct === p.product_id ? 'rgba(51,102,255,0.1)' : 'rgba(255,255,255,0.02)',
+                                                border: selectedConfigProduct === p.product_id ? '1px solid #3366ff' : '1px solid rgba(255,255,255,0.05)',
+                                                borderRadius: '8px',
+                                                color: '#fff',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {p.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedConfigProduct && (
+                                    <div className="card" style={{ padding: '24px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                                            <h4 style={{ margin: 0 }}>Stored Configs</h4>
+                                            <button className="btn-outline" style={{ padding: '5px 15px', fontSize: '0.75rem' }}>NEW CONFIG</button>
                                         </div>
-                                        <div style={{
-                                            background: '#0a0a0a',
-                                            padding: '16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid rgba(255,255,255,0.03)'
-                                        }}>
-                                            <code style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.3)' }}>
-                                                {p.hwid || 'No hardware linked yet. Launch the injector to link.'}
-                                            </code>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {configs.map((c, i) => (
+                                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                                    <span>{c.config_name}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>{new Date(c.updated_at).toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                            {configs.length === 0 && <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)' }}>No cloud configs for this product.</p>}
                                         </div>
                                     </div>
-                                ))}
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'security' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                                <div>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '20px' }}>Hardware Lock</h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        {userProducts?.map((p, idx) => (
+                                            <div key={idx} className="card" style={{ padding: '24px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>{p.name}</h3>
+                                                    {p.hwid && !isCEO && (
+                                                        <button
+                                                            onClick={() => handleResetHWID(p.product_id)}
+                                                            disabled={resetting === p.product_id}
+                                                            className="btn-outline"
+                                                            style={{ padding: '8px 20px', fontSize: '0.8rem' }}
+                                                        >
+                                                            {resetting === p.product_id ? 'WAIT...' : 'RESET HWID'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div style={{
+                                                    background: '#0a0a0a',
+                                                    padding: '16px',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid rgba(255,255,255,0.03)'
+                                                }}>
+                                                    <code style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.3)', wordBreak: 'break-all' }}>
+                                                        {p.hwid || 'No hardware linked yet. Launch the injector to link.'}
+                                                    </code>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '20px' }}>Login History (Sessions)</h3>
+                                    <div className="card" style={{ padding: '20px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            {history.map((h, i) => (
+                                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>
+                                                    <div>
+                                                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{h.ip_address}</p>
+                                                        <p style={{ margin: 0, fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{h.hwid || 'N/A'}</p>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{new Date(h.created_at).toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                            {history.length === 0 && <p style={{ textAlign: 'center', opacity: 0.3 }}>No session records yet.</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'tickets' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Support Center</h3>
+                                    <button className="btn" style={{ padding: '8px 20px', fontSize: '0.8rem' }}>OPEN NEW TICKET</button>
+                                </div>
+                                <div className="card" style={{ overflow: 'hidden' }}>
+                                    {tickets.map((t, i) => (
+                                        <div key={i} style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <h5 style={{ margin: 0, fontSize: '1rem' }}>{t.subject}</h5>
+                                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>Ticket #{t.id} - {new Date(t.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                            <span style={{
+                                                fontSize: '0.6rem',
+                                                fontWeight: '900',
+                                                background: t.status === 'open' ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)',
+                                                color: t.status === 'open' ? '#22c55e' : 'rgba(255,255,255,0.4)',
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                textTransform: 'uppercase'
+                                            }}>{t.status}</span>
+                                        </div>
+                                    ))}
+                                    {tickets.length === 0 && <div style={{ padding: '60px', textAlign: 'center', opacity: 0.3 }}>You don't have any support tickets.</div>}
+                                </div>
                             </div>
                         )}
                     </div>

@@ -235,10 +235,59 @@ export const resetHWID = async (req: any, res: Response) => {
         const { product_id } = req.body;
         const user = User.findByDiscordId(req.user.discord_id) as any;
         if (!user) return res.status(404).json({ error: 'User not found' });
-        db.prepare('UPDATE user_products SET hwid = NULL WHERE user_id = ? AND product_id = ?').run(user.id, product_id);
+
+        const license: any = db.prepare('SELECT id, hwid_reset_at FROM user_products WHERE user_id = ? AND product_id = ?').get(user.id, product_id);
+        if (!license) return res.status(404).json({ error: 'License not found' });
+
+        // Cooldown de 7 dias (604800000ms)
+        const cooldown = 7 * 24 * 60 * 60 * 1000;
+        if (license.hwid_reset_at && (new Date().getTime() - new Date(license.hwid_reset_at).getTime() < cooldown)) {
+            const remaining = Math.ceil((cooldown - (new Date().getTime() - new Date(license.hwid_reset_at).getTime())) / (1000 * 60 * 60 * 24));
+            return res.status(403).json({ error: `Você já resetou recentemente. Aguarde mais ${remaining} dias.` });
+        }
+
+        db.prepare('UPDATE user_products SET hwid = NULL, hwid_reset_at = DATETIME("now") WHERE id = ?').run(license.id);
 
         logSystemEvent(user.id, 'RESET DE HWID (PAINEL)', `Reset de máquina efetuado no ID do Produto: ${product_id}`);
+        res.json({ success: true, message: 'HWID resetado com sucesso.' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const saveUserConfig = async (req: any, res: Response) => {
+    try {
+        const { product_id, config_name, config_json } = req.body;
+        const user = User.findByDiscordId(req.user.discord_id) as any;
+
+        db.prepare(`
+            INSERT INTO user_configs (user_id, product_id, config_name, config_json) 
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, product_id, config_name) DO UPDATE SET config_json = excluded.config_json, updated_at = DATETIME('now')
+        `).run(user.id, product_id, config_name, JSON.stringify(config_json));
+
         res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getUserConfigs = async (req: any, res: Response) => {
+    try {
+        const { product_id } = req.params;
+        const user = User.findByDiscordId(req.user.discord_id) as any;
+        const configs = db.prepare('SELECT * FROM user_configs WHERE user_id = ? AND product_id = ?').all(user.id, product_id);
+        res.json(configs);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getLoginHistory = async (req: any, res: Response) => {
+    try {
+        const user = User.findByDiscordId(req.user.discord_id) as any;
+        const logs = db.prepare('SELECT ip_address, created_at, hwid FROM login_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 10').all(user.id);
+        res.json(logs);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -273,13 +322,14 @@ export const getMe = async (req: any, res: Response) => {
 
         let products;
         if (isCEO) {
-            const allProducts = db.prepare('SELECT id as product_id, name FROM products').all();
+            const allProducts = db.prepare('SELECT id as product_id, name, current_version, changelog, download_url FROM products').all();
             products = allProducts.map((p: any) => ({
-                product_id: p.product_id, name: p.name, license_key: 'ZYRO-CEO-ACCESS-GOD-MODE', expires_at: null, status: 'active', hwid: 'BYPASS-SYSTEM'
+                product_id: p.product_id, name: p.name, license_key: 'ZYRO-CEO-ACCESS-GOD-MODE', expires_at: null, status: 'active', hwid: 'BYPASS-SYSTEM',
+                current_version: p.current_version, changelog: p.changelog, download_url: p.download_url
             }));
         } else {
             products = db.prepare(`
-                SELECT up.id, up.product_id, p.name, up.license_key, up.expires_at, up.status, up.hwid 
+                SELECT up.id, up.product_id, p.name, up.license_key, up.expires_at, up.status, up.hwid, p.current_version, p.changelog, p.download_url
                 FROM user_products up JOIN products p ON up.product_id = p.id WHERE up.user_id = ?`
             ).all(user.id);
         }

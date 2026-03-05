@@ -357,3 +357,40 @@ export const deleteVersion = (req: Request, res: Response) => {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
+// --- User & Reseller Management ---
+export const listUsers = (req: Request, res: Response) => {
+    try {
+        const users = db.prepare('SELECT id, discord_id, username, avatar, role, reseller_balance, created_at FROM users ORDER BY created_at DESC').all();
+        res.json(users);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const updateUserRole = (req: Request, res: Response) => {
+    try {
+        const { role } = req.body;
+        db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, getId(req.params.id));
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'ALTERAÇÃO DE CARGO', `Alterou cargo do usuário ID ${req.params.id} para ${role}`);
+        res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const addResellerBalance = (req: Request, res: Response) => {
+    try {
+        const { amount } = req.body;
+        db.prepare('UPDATE users SET reseller_balance = reseller_balance + ? WHERE id = ?').run(amount, getId(req.params.id));
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'RECARGA SALDO', `Adicionou R$ ${amount} de saldo ao revendedor ID ${req.params.id}`);
+        res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const setResellerBalance = (req: Request, res: Response) => {
+    try {
+        const { amount } = req.body;
+        db.prepare('UPDATE users SET reseller_balance = ? WHERE id = ?').run(amount, getId(req.params.id));
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'AJUSTE SALDO', `Definiu R$ ${amount} de saldo para o revendedor ID ${req.params.id}`);
+        res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};

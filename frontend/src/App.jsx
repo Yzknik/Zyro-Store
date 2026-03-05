@@ -7,6 +7,7 @@ import TosPage from './pages/TosPage'
 import VerifiedPage from './pages/VerifiedPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminPage from './pages/AdminPage'
+import ResellerPage from './pages/ResellerPage'
 import ErrorPage from './pages/ErrorPage'
 import { translations } from './i18n'
 import { AuthProvider } from './context/AuthContext'
@@ -116,6 +117,7 @@ function App() {
               <Route path="/verified" element={<VerifiedPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/reseller" element={<ResellerPage />} />
               <Route path="*" element={<ErrorPage />} />
             </Routes>
           </div>

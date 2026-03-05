@@ -14,11 +14,16 @@ class ProductModel {
 
     // Products
     static getAll(): any[] {
-        return db.prepare(`
+        const products = db.prepare(`
             SELECT p.*, c.name as category_name 
             FROM products p 
             LEFT JOIN categories c ON p.category_id = c.id
-        `).all();
+        `).all() as any[];
+
+        return products.map(p => {
+            const plans = db.prepare('SELECT * FROM plans WHERE product_id = ?').all(p.id);
+            return { ...p, plans };
+        });
     }
 
     static getById(id: number | string): any {
@@ -26,10 +31,10 @@ class ProductModel {
     }
 
     static create(data: any): number | bigint {
-        const { name, description, category_id, image_url } = data;
+        const { name, description, category_id, image_url, status } = data;
         const result = db.prepare(
-            'INSERT INTO products (name, description, category_id, image_url) VALUES (?, ?, ?, ?)'
-        ).run(name, description, category_id, image_url);
+            'INSERT INTO products (name, description, category_id, image_url, status) VALUES (?, ?, ?, ?, ?)'
+        ).run(name, description, category_id, image_url, status || 'UNDETECTED');
         return result.lastInsertRowid;
     }
 

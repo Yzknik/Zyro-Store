@@ -11,9 +11,10 @@ const Navbar = ({ isMenuOpen, setIsMenuOpen }) => {
   const navLinks = [
     { label: t.nav.features, href: '/#features' },
     { label: t.nav.products, href: '/products', type: 'link' },
-    { label: 'COMMUNITY', href: 'https://discord.gg/zyrostore' },
+    { label: 'COMMUNITY', href: 'https://discord.gg/zyrogg' },
     { label: t.nav.tos, href: '/tos', type: 'link' },
-    ...(isAdmin ? [{ label: 'ADMIN', href: '/admin', type: 'link' }] : [])
+    ...(isAdmin ? [{ label: 'ADMIN', href: '/admin', type: 'link' }] : []),
+    ...(user && (user.role === 'reseller' || user.role === 'admin' || user.discord_id === '1249488594414997676') ? [{ label: 'RESELLER', href: '/reseller', type: 'link' }] : [])
   ]
 
   return (

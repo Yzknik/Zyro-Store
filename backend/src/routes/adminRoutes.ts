@@ -59,4 +59,10 @@ router.get('/versions', adminController.listVersions);
 router.post('/versions', adminController.createVersion);
 router.delete('/versions/:id', adminController.deleteVersion);
 
+// Users & Resellers
+router.get('/users', adminController.listUsers);
+router.patch('/users/:id/role', adminController.updateUserRole);
+router.post('/users/:id/set-reseller-balance', adminController.setResellerBalance);
+router.post('/users/:id/reseller-balance', adminController.addResellerBalance);
+
 export default router;

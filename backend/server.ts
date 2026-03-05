@@ -38,6 +38,8 @@ import adminRoutes from './src/routes/adminRoutes.js';
 import productRoutes from './src/routes/productRoutes.js';
 import launcherRoutes from './src/routes/launcherRoutes.js';
 import botRoutes from './src/routes/botRoutes.js';
+import ticketRoutes from './src/routes/ticketRoutes.js';
+import resellerRoutes from './src/routes/resellerRoutes.js';
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -45,6 +47,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/launcher', launcherRoutes);
 app.use('/api/bot', botRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/reseller', resellerRoutes);
 
 // Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
