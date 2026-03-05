@@ -74,17 +74,64 @@ const ActivityChart = ({ data, color = "#3b82f6" }) => {
     );
 };
 
+const ConfirmModal = ({ isOpen, title, message, confirmText = "CONFIRMAR", onConfirm, onCancel }) => {
+    if (!isOpen) return null;
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+            animation: 'fadeIn 0.3s ease'
+        }}>
+            <style>{`
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes pop { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            `}</style>
+            <div style={{
+                background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '420px',
+                textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                animation: 'pop 0.4s var(--curve-bounce)'
+            }}>
+                <div style={{
+                    width: '60px', height: '60px', background: 'rgba(51, 102, 255, 0.1)',
+                    borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 25px'
+                }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3366ff" strokeWidth="2.5"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '12px', fontWeight: '800', letterSpacing: '-0.5px' }}>{title}</h2>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '35px' }}>{message}</p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button onClick={onCancel} style={{
+                        flex: 1, padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'transparent', color: '#fff', fontWeight: '700', cursor: 'pointer',
+                        transition: 'all 0.3s'
+                    }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>CANCELAR</button>
+                    <button onClick={onConfirm} style={{
+                        flex: 1, padding: '16px', borderRadius: '14px', border: 'none',
+                        background: '#3366ff', color: '#fff', fontWeight: '700', cursor: 'pointer',
+                        boxShadow: '0 10px 20px -5px rgba(51, 102, 255, 0.3)',
+                        transition: 'all 0.3s'
+                    }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>{confirmText}</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const AdminPage = () => {
     const { isAdmin, loading: authLoading } = useAuth()
     const [activeTab, setActiveTab] = useState('dashboard')
     const [notification, setNotification] = useState(null)
     const notify = (msg, type = 'success') => setNotification({ msg, type })
 
-    const [stats, setStats] = useState({ users: 0, products: 0, totalSales: 0, activeLicenses: 0, monthlySales: 0, chartData: [] })
+    const [stats, setStats] = useState({ users: 0, discordMembers: 0, products: 0, totalSales: 0, activeLicenses: 0, monthlySales: 0, chartData: [] })
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
     const [licenses, setLicenses] = useState([])
     const [moderators, setModerators] = useState([])
+    const [logs, setLogs] = useState([])
 
     const [newCatName, setNewCatName] = useState('')
     const [newProduct, setNewProduct] = useState({ name: '', description: '', category_id: '', image_url: '' })
@@ -94,37 +141,30 @@ const AdminPage = () => {
     const [newsList, setNewsList] = useState([])
     const [allSettings, setAllSettings] = useState({})
     const [newNews, setNewNews] = useState({ title: '', description: '' })
+    const [localSettings, setLocalSettings] = useState({})
+
+    const [versionList, setVersionList] = useState([])
+    const [newVersion, setNewVersion] = useState({ product_id: '', version: '', download_url: '', changelog: '', is_stable: true })
+
+    const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', onConfirm: () => { } })
+    const askConfirm = (title, message, confirmText, action) => {
+        setConfirmConfig({ isOpen: true, title, message, confirmText, onConfirm: () => { action(); setConfirmConfig(prev => ({ ...prev, isOpen: false })) } })
+    }
 
     useEffect(() => { if (isAdmin) refreshData() }, [isAdmin, activeTab])
 
-    const refreshData = async () => {
-        if (activeTab === 'dashboard') await fetchStats();
-        await fetchProducts();
-        await fetchCategories();
-        await fetchLicenses();
-        await fetchModerators();
-        await fetchNews();
-        await fetchSettings();
-    }
+    useEffect(() => {
+        setLocalSettings(allSettings);
+    }, [allSettings])
 
     const fetchStats = async () => {
-        try {
-            const res = await axios.get(`${API_URL}/api/admin/stats`, { withCredentials: true });
-            setStats(res.data)
-        } catch (e) { console.error('Stats error', e) }
+        try { const res = await axios.get(`${API_URL}/api/admin/stats`, { withCredentials: true }); setStats(res.data) } catch (e) { }
+    }
+    const fetchProducts = async () => {
+        try { const res = await axios.get(`${API_URL}/api/products`, { withCredentials: true }); setProducts(res.data) } catch (e) { }
     }
     const fetchCategories = async () => {
         try { const res = await axios.get(`${API_URL}/api/admin/categories`, { withCredentials: true }); setCategories(res.data) } catch (e) { }
-    }
-    const fetchProducts = async () => {
-        try {
-            const res = await axios.get(`${API_URL}/api/products`);
-            const prodsWithPlans = await Promise.all(res.data.map(async p => {
-                const plans = await axios.get(`${API_URL}/api/products/${p.id}/plans`);
-                return { ...p, plans: plans.data };
-            }));
-            setProducts(prodsWithPlans)
-        } catch (e) { }
     }
     const fetchLicenses = async () => {
         try { const res = await axios.get(`${API_URL}/api/admin/licenses`, { withCredentials: true }); setLicenses(res.data) } catch (e) { }
@@ -137,6 +177,25 @@ const AdminPage = () => {
     }
     const fetchSettings = async () => {
         try { const res = await axios.get(`${API_URL}/api/admin/settings`, { withCredentials: true }); setAllSettings(res.data) } catch (e) { }
+    }
+    const fetchLogs = async () => {
+        try { const res = await axios.get(`${API_URL}/api/admin/logs`, { withCredentials: true }); setLogs(res.data) } catch (e) { }
+    }
+    const fetchVersions = async () => {
+        try { const res = await axios.get(`${API_URL}/api/admin/versions`, { withCredentials: true }); setVersionList(res.data) } catch (e) { }
+    }
+
+
+    const refreshData = async () => {
+        if (activeTab === 'dashboard') await fetchStats();
+        await fetchProducts();
+        await fetchCategories();
+        await fetchLicenses();
+        await fetchModerators();
+        await fetchNews();
+        await fetchSettings();
+        if (activeTab === 'updates') await fetchVersions();
+        await fetchLogs();
     }
 
     const handleCreateNews = async (e) => {
@@ -163,12 +222,13 @@ const AdminPage = () => {
         try {
             await axios.post(`${API_URL}/api/admin/categories`, { name: newCatName }, { withCredentials: true });
             setNewCatName(''); fetchCategories(); notify('CATEGORIA CRIADA!');
-        } catch (err) { notify('ERRO AO CRIAR CATEGORIA', 'error') }
+        } catch (err) { notify(err.response?.data?.error || 'ERRO AO CRIAR CATEGORIA', 'error') }
     }
 
-    const handleDeleteCategory = async (id) => {
-        if (!confirm('DESEJA REALMENTE DELETAR ESTA CATEGORIA?')) return
-        try { await axios.delete(`${API_URL}/api/admin/categories/${id}`, { withCredentials: true }); fetchCategories(); notify('CATEGORIA REMOVIDA.') } catch (e) { }
+    const handleDeleteCategory = (id) => {
+        askConfirm('DELETAR CATEGORIA?', 'Isso pode afetar os produtos vinculados. Deseja prosseguir?', 'SIM, DELETAR', async () => {
+            try { await axios.delete(`${API_URL}/api/admin/categories/${id}`, { withCredentials: true }); fetchCategories(); notify('CATEGORIA REMOVIDA.') } catch (e) { }
+        })
     }
 
     const handleCreateProduct = async (e) => {
@@ -180,9 +240,10 @@ const AdminPage = () => {
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
     }
 
-    const handleDeleteProduct = async (id) => {
-        if (!confirm('DELETAR PRODUTO E TODOS OS PLANOS?')) return
-        try { await axios.delete(`${API_URL}/api/admin/products/${id}`, { withCredentials: true }); fetchProducts(); notify('PRODUTO REMOVIDO.') } catch (e) { }
+    const handleDeleteProduct = (id) => {
+        askConfirm('DELETAR PRODUTO?', 'Todos os planos e licenças deste produto serão removidos permanentemente.', 'REMOVER TUDO', async () => {
+            try { await axios.delete(`${API_URL}/api/admin/products/${id}`, { withCredentials: true }); fetchProducts(); notify('PRODUTO REMOVIDO.') } catch (e) { }
+        })
     }
 
     const handleCreatePlan = async (e) => {
@@ -211,9 +272,10 @@ const AdminPage = () => {
         try { await axios.patch(`${API_URL}/api/admin/licenses/${id}/status`, { status }, { withCredentials: true }); fetchLicenses(); notify('STATUS ATUALIZADO.') } catch (e) { }
     }
 
-    const handleDeleteLicense = async (id) => {
-        if (!confirm('REVOGAR ESTA KEY PERMANENTEMENTE?')) return
-        try { await axios.delete(`${API_URL}/api/admin/licenses/${id}`, { withCredentials: true }); fetchLicenses(); notify('KEY REVOGADA.') } catch (e) { }
+    const handleDeleteLicense = (id) => {
+        askConfirm('REVOGAR LICENÇA?', 'O acesso do usuário será interrompido imediatamente.', 'REVOGAR AGORA', async () => {
+            try { await axios.delete(`${API_URL}/api/admin/licenses/${id}`, { withCredentials: true }); fetchLicenses(); notify('KEY REVOGADA.') } catch (e) { }
+        })
     }
 
     const handleAddModerator = async (e) => {
@@ -224,10 +286,37 @@ const AdminPage = () => {
         } catch (err) { notify('ERRO AO ADICIONAR MOD.', 'error') }
     }
 
-    const handleRemoveModerator = async (id) => {
-        if (!confirm('REMOVER PERMISSÕES DESTE MODERADOR?')) return
-        try { await axios.delete(`${API_URL}/api/admin/moderators/${id}`, { withCredentials: true }); fetchModerators(); notify('MODERADOR REMOVIDO.') } catch (e) { }
+    const handleRemoveModerator = (id) => {
+        askConfirm('REMOVER MODERADOR?', 'Este usuário perderá acesso imediato ao painel administrativo.', 'REMOVER ACESSO', async () => {
+            try { await axios.delete(`${API_URL}/api/admin/moderators/${id}`, { withCredentials: true }); fetchModerators(); notify('MODERADOR REMOVIDO.') } catch (e) { }
+        })
     }
+
+    const handlePullMembers = () => {
+        askConfirm('SINCRONIZAR MEMBROS?', 'Isso forçará a entrada de todos os usuários no servidor do Discord. Pode levar alguns segundos.', 'INICIAR PUXADA', async () => {
+            try {
+                notify('Sincronizando usuários... Feche e aguarde.', 'success');
+                const res = await axios.post(`${API_URL}/api/admin/pull-members`, {}, { withCredentials: true })
+                notify(`CONCLUÍDO! ${res.data.count} membros processados.`)
+            } catch (err) { notify('ERRO AO PUXAR MEMBROS.', 'error') }
+        })
+    }
+
+    const handleCreateVersion = async (e) => {
+        e.preventDefault()
+        try {
+            await axios.post(`${API_URL}/api/admin/versions`, newVersion, { withCredentials: true })
+            setNewVersion({ product_id: '', version: '', download_url: '', changelog: '', is_stable: true })
+            fetchVersions(); notify('VERSÃO PUBLICADA!')
+        } catch (err) { notify('ERRO AO PUBLICAR VERSÃO', 'error') }
+    }
+
+    const handleDeleteVersion = (id) => {
+        askConfirm('DELETAR VERSÃO?', 'Esta atualização será removida permanentemente.', 'DELETAR', async () => {
+            try { await axios.delete(`${API_URL}/api/admin/versions/${id}`, { withCredentials: true }); fetchVersions(); notify('VERSÃO REMOVIDA.') } catch (e) { }
+        })
+    }
+
 
     if (authLoading) return null
     if (!isAdmin) return <Navigate to="/" />
@@ -236,15 +325,109 @@ const AdminPage = () => {
         <div style={{ minHeight: '100vh', background: '#080c14', color: '#fff' }}>
             <Navbar />
             {notification && <Notification message={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
+            <ConfirmModal {...confirmConfig} onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} />
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', overflowX: 'auto' }}>
-                    {[['dashboard', 'CENTRAL'], ['products', 'STOCKS'], ['categories', 'TAGS'], ['licenses', 'KEYS'], ['news', 'UPDATES'], ['settings', 'COMMUNITY'], ['moderators', 'ACCESS']].map(([tab, label]) => (
-                        <button key={tab} onClick={() => setActiveTab(tab)} style={{ background: 'none', border: 'none', color: activeTab === tab ? '#3b82f6' : 'rgba(255,255,255,0.2)', fontSize: '0.85rem', fontWeight: '950', cursor: 'pointer', transition: '0.3s', letterSpacing: '2px' }}>
+                    {[
+                        ['dashboard', 'CENTRAL'],
+                        ['products', 'STOCKS'],
+                        ['categories', 'TAGS'],
+                        ['licenses', 'KEYS'],
+                        ['updates', 'VERSIONS'],
+                        ['news', 'NOTICES'],
+                        ['settings', 'COMMUNITY'],
+                        ['moderators', 'ACCESS'],
+                        ['logs', 'LOGS TÁTICOS']
+                    ].map(([tab, label]) => (
+                        <button key={tab} onClick={() => setActiveTab(tab)} style={{ background: 'none', border: 'none', color: activeTab === tab ? '#3b82f6' : 'rgba(255,255,255,0.2)', fontSize: '0.85rem', fontWeight: '950', cursor: 'pointer', transition: '0.3s', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
                             {label}
                         </button>
                     ))}
                 </div>
+
+                {activeTab === 'updates' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                        <div>
+                            <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '20px', marginBottom: '30px' }}>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '1px' }}>LANÇAR ATUALIZAÇÃO</h2>
+                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Envie novas versões e changelogs para os produtos.</p>
+                            </div>
+                            <form className="card" onSubmit={handleCreateVersion} style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <select required className="input" value={newVersion.product_id} onChange={e => setNewVersion({ ...newVersion, product_id: e.target.value })}>
+                                    <option value="">SELECIONE O PRODUTO</option>
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                                <input required type="text" placeholder="Versão (ex: v1.0.4)" className="input" value={newVersion.version} onChange={e => setNewVersion({ ...newVersion, version: e.target.value })} />
+                                <input required type="url" placeholder="Link de Download" className="input" value={newVersion.download_url} onChange={e => setNewVersion({ ...newVersion, download_url: e.target.value })} />
+                                <textarea placeholder="O que mudou? (Changelog)" className="input" style={{ minHeight: '100px' }} value={newVersion.changelog} onChange={e => setNewVersion({ ...newVersion, changelog: e.target.value })} />
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={newVersion.is_stable} onChange={e => setNewVersion({ ...newVersion, is_stable: e.target.checked })} />
+                                    MARCAR COMO ESTÁVEL
+                                </label>
+                                <button type="submit" className="button" style={{ background: '#3b82f6', color: '#fff', marginTop: '10px' }}>PUBLICAR LANÇAMENTO</button>
+                            </form>
+                        </div>
+                        <div>
+                            <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '20px', marginBottom: '30px' }}>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '1px' }}>HISTÓRICO DE VERSÕES</h2>
+                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Versões ativas e estáveis por software.</p>
+                            </div>
+                            <div style={{ display: 'grid', gap: '15px' }}>
+                                {versionList.map(v => (
+                                    <div key={v.id} className="card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <strong style={{ fontSize: '1.1rem', color: '#3b82f6' }}>{v.version}</strong>
+                                                <span style={{ fontSize: '0.7rem', padding: '2px 8px', background: v.is_stable ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: v.is_stable ? '#22c55e' : '#ef4444', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                                    {v.is_stable ? 'ESTÁVEL' : 'BETA'}
+                                                </span>
+                                            </div>
+                                            <p style={{ margin: '5px 0 0', fontSize: '0.8rem', fontWeight: '700' }}>{v.product_name}</p>
+                                            <p style={{ margin: '5px 0 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{v.changelog || 'Nenhum detalhe informado.'}</p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <a href={v.download_url} target="_blank" rel="noreferrer" className="button" style={{ padding: '8px 12px', fontSize: '0.7rem', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>DOWNLOAD</a>
+                                            <button onClick={() => handleDeleteVersion(v.id)} className="button" style={{ padding: '8px 12px', fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none' }}>DELETAR</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'logs' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '20px', marginBottom: '30px' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '1px', filter: 'drop-shadow(0 0 10px rgba(59,130,246,0.3))' }}>SISTEMA DE AUDITORIA & TRACKING</h2>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', maxWidth: '600px', lineHeight: '1.6' }}>Histórico completo operacional do painel Zyro. Todas as integrações com os bots de atendimento Discord deixam rastros.</p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {logs && logs.map(l => (
+                                <div key={l.id} className="card" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <img src={l.avatar} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                                        <div>
+                                            <p style={{ fontSize: '0.85rem', margin: 0, fontWeight: '700' }}><strong style={{ color: '#3b82f6' }}>{l.username}</strong> executou: <span style={{ color: '#fff' }}>{l.action}</span></p>
+                                            <p style={{ fontSize: '0.75rem', margin: 0, color: 'rgba(255,255,255,0.4)', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                                                <span>ID: {l.discord_id}</span> • <span>{l.details || 'N/A'}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+                                        {new Date(l.created_at).toLocaleString('pt-BR')}
+                                    </span>
+                                </div>
+                            ))}
+                            {(!logs || logs.length === 0) && (
+                                <div className="card" style={{ padding: '30px', textAlign: 'center', opacity: 0.5 }}>
+                                    Sem dados do Discord para exibir hoje.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {activeTab === 'dashboard' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
@@ -435,12 +618,21 @@ const AdminPage = () => {
 
                 {activeTab === 'moderators' && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
-                        <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
-                            <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>WHITE-LIST ADMIN</h3>
-                            <form onSubmit={handleAddModerator} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                <input type="text" placeholder="Discord ID do Moderador" value={newModId} onChange={e => setNewModId(e.target.value)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
-                                <button type="submit" className="btn-primary" style={{ height: '55px', borderRadius: '18px', fontWeight: '950' }}>AUTORIZAR MODERADOR</button>
-                            </form>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+                            <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
+                                <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>WHITE-LIST ADMIN</h3>
+                                <form onSubmit={handleAddModerator} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <input type="text" placeholder="Discord ID do Moderador" value={newModId} onChange={e => setNewModId(e.target.value)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                    <button type="submit" className="btn-primary" style={{ height: '55px', borderRadius: '18px', fontWeight: '950' }}>AUTORIZAR MODERADOR</button>
+                                </form>
+                            </div>
+                            <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px', border: '1px solid rgba(139, 92, 246, 0.4)' }}>
+                                <h3 style={{ marginBottom: '1rem', fontWeight: '950', color: '#8b5cf6' }}>FORÇAR ENTRADA (OAUTH2)</h3>
+                                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1.5rem', lineHeight: '1.5' }}>Puxa todos os membros que já logaram no banco de dados para dentro do seu servidor principal do Discord.</p>
+                                <button onClick={handlePullMembers} style={{ width: '100%', height: '55px', borderRadius: '18px', fontWeight: '950', background: '#8b5cf6', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                                    <span>PUXAR USUÁRIOS PRO DISCORD</span>
+                                </button>
+                            </div>
                         </div>
                         <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                             <h3 style={{ marginBottom: '2rem', fontWeight: '950' }}>ESTAFE AUTORIZADA</h3>
@@ -503,7 +695,8 @@ const AdminPage = () => {
                                         <div style={{ display: 'flex', gap: '15px' }}>
                                             <input
                                                 type="text"
-                                                defaultValue={allSettings[s.key]}
+                                                value={localSettings[s.key] !== undefined ? localSettings[s.key] : ''}
+                                                onChange={(e) => setLocalSettings({ ...localSettings, [s.key]: e.target.value })}
                                                 onBlur={(e) => handleUpdateSetting(s.key, e.target.value)}
                                                 style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }}
                                             />

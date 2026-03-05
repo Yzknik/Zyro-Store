@@ -171,26 +171,36 @@ const DashboardPage = () => {
                                     ))}
                                 </div>
 
-                                {/* News & Platform Row */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
-                                    <div className="card" style={{ padding: '30px' }}>
-                                        <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '20px' }}>Platform Updates</h4>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                            {news.length > 0 ? news.map((n, i) => (
-                                                <div key={i} style={{ paddingBottom: i !== news.length - 1 ? '20px' : 0, borderBottom: i !== news.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                        <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{n.title}</span>
-                                                        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>{new Date(n.created_at).toLocaleDateString()}</span>
-                                                    </div>
-                                                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>{n.description}</p>
+                                {/* Platform Support Row */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px', width: '100%' }}>
+
+                                    {/* Discord Connection Card */}
+                                    <div className="card" style={{ padding: '30px', width: '100%' }}>
+                                        <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '20px' }}>Discord Connection</h4>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <img src={user.avatar} style={{ width: '50px', height: '50px', borderRadius: '50%', border: '2px solid rgba(88, 101, 242, 0.5)' }} alt="Discord Avatar" />
+                                            <div>
+                                                <h5 style={{ fontSize: '1.1rem', margin: 0, fontWeight: '700' }}>{user.username}</h5>
+                                                <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', margin: 0, marginTop: '4px', fontFamily: '"JetBrains Mono", monospace' }}>{user.discord_id}</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Access Level</span>
+                                                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#5865F2', background: 'rgba(88,101,242,0.1)', padding: '4px 10px', borderRadius: '6px' }}>{userRole}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Sync Status</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#22c55e' }}>LINKED</span>
                                                 </div>
-                                            )) : (
-                                                <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.2)' }}>No updates posted yet.</p>
-                                            )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="card" style={{ padding: '30px' }}>
+                                    {/* Live Status Card */}
+                                    <div className="card" style={{ padding: '30px', width: '100%' }}>
                                         <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '20px' }}>Live Status</h4>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                             {[

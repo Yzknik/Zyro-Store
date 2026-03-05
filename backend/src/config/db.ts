@@ -8,6 +8,8 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../../data/zyro.db');
 const db = new Database(dbPath, { verbose: console.log });
 
+db.pragma('foreign_keys = ON');
+
 const initSchema = () => {
     db.exec(`
         CREATE TABLE IF NOT EXISTS categories (
@@ -68,11 +70,13 @@ const initSchema = () => {
 
         CREATE TABLE IF NOT EXISTS launcher_versions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
             version TEXT NOT NULL,
             download_url TEXT NOT NULL,
             changelog TEXT,
             is_stable INTEGER DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS platform_updates (
@@ -85,6 +89,15 @@ const initSchema = () => {
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         );
     `);
 
@@ -111,11 +124,13 @@ const initSchema = () => {
 
     // Migrations
     try { db.prepare('ALTER TABLE users ADD COLUMN password TEXT DEFAULT NULL').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN discord_access_token TEXT DEFAULT NULL').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN category_id INTEGER').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN image_url TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE user_products ADD COLUMN plan_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN product_id INTEGER').run(); } catch (e) { }
 
-    console.log('✅ SQLite Database Initialized with Categories and Plans');
+    console.log('✅ SQLite Database Initialized with System Logs');
 };
 
 initSchema();

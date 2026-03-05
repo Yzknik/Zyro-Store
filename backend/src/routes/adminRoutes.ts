@@ -48,4 +48,15 @@ router.delete('/news/:id', adminController.deleteNews);
 router.get('/settings', adminController.getSettings);
 router.post('/settings', adminController.updateSetting);
 
+// Logs
+router.get('/logs', adminController.getSystemLogs);
+
+// Pull Members
+router.post('/pull-members', adminController.pullDiscordMembers);
+
+// Launcher Versions / Updates
+router.get('/versions', adminController.listVersions);
+router.post('/versions', adminController.createVersion);
+router.delete('/versions/:id', adminController.deleteVersion);
+
 export default router;

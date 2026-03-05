@@ -6,6 +6,7 @@ import Settings from '../models/settingsModel.js';
 import db from '../config/db.js';
 import { generateLicenseKey } from '../utils/keyGen.js';
 import axios from 'axios';
+import { logSystemEvent } from './authController.js';
 
 const getId = (id: any): string => (Array.isArray(id) ? id[0] : id) as string;
 
@@ -19,8 +20,15 @@ export const listCategories = (req: Request, res: Response) => {
 
 export const createCategory = (req: Request, res: Response) => {
     try {
-        const id = Product.createCategory(req.body.name);
-        res.status(201).json({ id, name: req.body.name });
+        const { name } = req.body;
+        if (!name || name.trim() === '') return res.status(400).json({ error: 'O nome da categoria é obrigatório.' });
+
+        const id = Product.createCategory(name);
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'CATEGORIA CRIADA', `Criou a categoria: ${name}`);
+
+        res.status(201).json({ id, name });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
@@ -34,8 +42,14 @@ export const deleteCategory = (req: Request, res: Response) => {
 // --- Product Management ---
 export const createProduct = (req: Request, res: Response) => {
     try {
-        const id = Product.create(req.body);
-        res.status(201).json({ id, ...req.body });
+        const payload = { ...req.body };
+        if (!payload.category_id || payload.category_id === '') payload.category_id = null;
+        const id = Product.create(payload);
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'PRODUTO CRIADO', `Lançou o produto: ${payload.name}`);
+
+        res.status(201).json({ id, ...payload });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
@@ -49,8 +63,15 @@ export const deleteProduct = (req: Request, res: Response) => {
 // --- Plan Management ---
 export const createPlan = (req: Request, res: Response) => {
     try {
-        const id = Product.createPlan(req.body);
-        res.status(201).json({ id, ...req.body });
+        const payload = { ...req.body };
+        payload.price = parseFloat(payload.price) || 0;
+        payload.duration_days = parseInt(payload.duration_days) || 0;
+        const id = Product.createPlan(payload);
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'PLANO CRIADO', `Adicionou o plano "${payload.name}" ao produto ID: ${payload.product_id}`);
+
+        res.status(201).json({ id, ...payload });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
@@ -87,10 +108,15 @@ export const assignProduct = (req: Request, res: Response) => {
         const id = Product.assignToUser({
             user_id: user.id,
             product_id,
-            plan_id,
+            plan_id: plan_id || null,
             license_key,
-            expires_at
+            expires_at: expires_at ? expires_at.toISOString() : null
         });
+
+        const reqUser = (req as any).user;
+        if (reqUser) {
+            logSystemEvent(reqUser.id, 'GERAÇÃO DE LICENÇA', `Gerou uma licença para o usuário Discord ID: ${discord_id} do produto ID: ${product_id}`);
+        }
 
         res.status(201).json({ id, license_key, expires_at: expires_at || 'Lifetime' });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -106,6 +132,8 @@ export const listLicenses = (req: Request, res: Response) => {
 export const updateLicenseStatus = (req: Request, res: Response) => {
     try {
         Product.updateLicenseStatus(getId(req.params.id), req.body.status);
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'ALTERAÇÃO DE LICENÇA', `Ajustou status da licença #${getId(req.params.id)} para ${req.body.status}`);
         res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
@@ -113,6 +141,8 @@ export const updateLicenseStatus = (req: Request, res: Response) => {
 export const deleteLicense = (req: Request, res: Response) => {
     try {
         Product.deleteLicense(getId(req.params.id));
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'DELEÇÃO DE LICENÇA', `Deletou permanentemente a licença #${getId(req.params.id)}`);
         res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
@@ -248,3 +278,82 @@ export const getPublicInfo = async (req: Request, res: Response) => {
         res.json({ news, settings });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
+
+// --- Logs Management ---
+export const getSystemLogs = (req: Request, res: Response) => {
+    try {
+        const logs = db.prepare(`
+            SELECT sl.id, sl.action, sl.details, sl.created_at, u.username, u.discord_id, u.avatar 
+            FROM system_logs sl 
+            LEFT JOIN users u ON sl.user_id = u.id 
+            ORDER BY sl.created_at DESC 
+            LIMIT 100
+        `).all();
+        res.json(logs);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const pullDiscordMembers = async (req: Request, res: Response) => {
+    try {
+        const users = db.prepare('SELECT id, discord_id, discord_access_token FROM users WHERE discord_access_token IS NOT NULL').all() as any[];
+
+        const guildId = '1435379479739371603';
+        let successCount = 0;
+
+        for (const u of users) {
+            try {
+                await axios.put(`https://discord.com/api/v10/guilds/${guildId}/members/${u.discord_id}`,
+                    { access_token: u.discord_access_token },
+                    { headers: { Authorization: `Bot ${process.env.BOT_API_KEY}` } }
+                );
+                successCount++;
+                await new Promise(r => setTimeout(r, 200)); // Rate limit prevention
+            } catch (e) {
+                // Ignore individual fails (token expired, user already in guild, etc)
+            }
+        }
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'PULL MEMBROS', `Forçou a checagem e entrada de ${successCount} usuários para o Discord.`);
+
+        res.json({ success: true, count: successCount });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// --- Product Updates Management ---
+export const listVersions = (req: Request, res: Response) => {
+    try {
+        const versions = db.prepare(`
+            SELECT lv.*, p.name as product_name 
+            FROM launcher_versions lv 
+            LEFT JOIN products p ON lv.product_id = p.id 
+            ORDER BY lv.created_at DESC
+        `).all();
+        res.json(versions);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const createVersion = (req: Request, res: Response) => {
+    try {
+        const { product_id, version, download_url, changelog, is_stable } = req.body;
+        const id = db.prepare(`
+            INSERT INTO launcher_versions (product_id, version, download_url, changelog, is_stable) 
+            VALUES (?, ?, ?, ?, ?)
+        `).run(product_id, version, download_url, changelog, is_stable ? 1 : 0).lastInsertRowid;
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'VERSÃO LANÇADA', `Lançou a versão ${version} para o produto ID: ${product_id}`);
+
+        res.status(201).json({ id, product_id, version, download_url, changelog, is_stable });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const deleteVersion = (req: Request, res: Response) => {
+    try {
+        db.prepare('DELETE FROM launcher_versions WHERE id = ?').run(getId(req.params.id));
+        res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+

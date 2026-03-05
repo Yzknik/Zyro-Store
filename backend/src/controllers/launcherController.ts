@@ -33,54 +33,72 @@ export const validateProduct = async (req: Request, res: Response) => {
             return res.status(401).json({ authorized: false, message: 'Senha incorreta.' });
         }
 
-        // 3. Busca a licença
-        let query = `
-            SELECT up.*, p.name as product_name 
-            FROM user_products up 
-            JOIN products p ON up.product_id = p.id 
-            WHERE up.user_id = ? AND up.status = 'active'
-        `;
-        let params: any[] = [user.id];
+        // 3. Verifica se o usuário é Admin/Owner
+        const admin = db.prepare('SELECT id FROM admin_whitelist WHERE discord_id = ?').get(user.discord_id);
+        const isAdmin = !!admin;
+        const role = isAdmin ? 'Owner' : 'User';
 
-        if (product_name) {
-            query += " AND p.name = ?";
-            params.push(product_name);
+        let activeLicenses = [];
+
+        if (isAdmin) {
+            // Se for admin, libera TODOS os produtos da loja
+            const allProducts: any[] = db.prepare(`
+                SELECT p.name as product_name, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key
+                FROM products p
+            `).all();
+            activeLicenses = allProducts;
+        } else {
+            // Se for usuário comum, busca as licenças dele
+            const licenses: any[] = db.prepare(`
+                SELECT up.*, p.name as product_name, pl.name as plan_name
+                FROM user_products up 
+                JOIN products p ON up.product_id = p.id 
+                LEFT JOIN plans pl ON up.plan_id = pl.id
+                WHERE up.user_id = ? AND up.status = 'active'
+            `).all(user.id);
+
+            for (const lic of licenses) {
+                if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
+                    db.prepare("UPDATE user_products SET status = 'expired' WHERE id = ?").run(lic.id);
+                    continue;
+                }
+                if (!lic.hwid) {
+                    db.prepare('UPDATE user_products SET hwid = ? WHERE id = ?').run(hwid, lic.id);
+                } else if (lic.hwid !== hwid) {
+                    return res.status(403).json({ authorized: false, message: `HWID mismatch no produto: ${lic.product_name}.` });
+                }
+                activeLicenses.push(lic);
+            }
         }
 
-        const license: any = db.prepare(query).get(...params);
-
-        if (!license) {
-            return res.status(403).json({ authorized: false, message: 'Licença inexistente ou expirada.' });
+        if (activeLicenses.length === 0 && !isAdmin) {
+            return res.status(403).json({ authorized: false, message: 'Você não possui licenças ativas.' });
         }
 
-        // Validação de Expiração
-        if (license.expires_at && new Date(license.expires_at) < new Date()) {
-            db.prepare("UPDATE user_products SET status = 'expired' WHERE id = ?").run(license.id);
-            return res.status(403).json({ authorized: false, message: 'Sua licença expirou recentemente.' });
-        }
+        // 5. Success Response com Perfil e Cargo
+        const summary = activeLicenses.map(l => `${l.product_name} [${l.plan_name || 'Lifetime'}] - ${l.expires_at || 'Nunca'} ID:${l.license_key}`).join(' | ');
 
-        // 4. HWID Logic (Multi-step verification)
-        if (!license.hwid) {
-            db.prepare('UPDATE user_products SET hwid = ? WHERE id = ?').run(hwid, license.id);
-        } else if (license.hwid !== hwid) {
-            return res.status(403).json({ authorized: false, message: 'Hardware ID Incorreto. Solicite reset no painel.' });
-        }
-
-        // 5. Success Response with Security Data
         res.json({
             authorized: true,
-            message: 'Conectado com sucesso!',
-            data: {
-                username: username,
-                discord: user.discord_id,
-                product: license.product_name,
-                expiry: license.expires_at || 'Life-time',
-                hwid_bound: true,
-                session_token: Math.random().toString(36).substring(2, 15) // Token temporário para sessão
-            }
+            message: 'Acesso concedido!',
+            user_info: {
+                username: user.username,
+                discord_id: user.discord_id,
+                avatar: user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png',
+                role: role
+            },
+            games_summary: summary,
+            products: activeLicenses.map(l => ({
+                name: l.product_name,
+                plan: l.plan_name || 'Lifetime',
+                expiry: l.expires_at || 'Lifetime',
+                key: l.license_key
+            })),
+            session_token: Math.random().toString(36).substring(2, 15)
         });
 
     } catch (err: any) {
-        res.status(500).json({ error: 'Internal Server Security Error' });
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 };
