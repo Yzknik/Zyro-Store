@@ -9,7 +9,7 @@ import API_URL from '../api'
 
 const DashboardPage = () => {
     const { t } = useContext(LangContext)
-    const { user, userProducts, isAdmin, loading, checkAuth } = useAuth()
+    const { user, userProducts, isAdmin, role, loading, checkAuth } = useAuth()
     const [resetting, setResetting] = useState(null)
     const [showKeys, setShowKeys] = useState({})
     const [currentTime, setCurrentTime] = useState(new Date())
@@ -83,7 +83,7 @@ const DashboardPage = () => {
     if (!user) return <Navigate to="/" />
 
     const isCEO = user.discord_id === '1249488594414997676'
-    const userRole = user.role || (isCEO ? 'ZYRO OWNER' : isAdmin ? 'STAFF' : 'MEMBER')
+    const userRole = role || (isCEO ? 'OWNER' : isAdmin ? 'STAFF' : 'MEMBER')
 
     return (
         <div style={{ minHeight: '100vh', background: '#050505', color: '#fff' }}>
@@ -116,7 +116,7 @@ const DashboardPage = () => {
                                 borderRadius: '4px',
                                 letterSpacing: '0.1em'
                             }}>
-                                {userRole}
+                                {userRole.toUpperCase()}
                             </span>
                         </div>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>Welcome back to your workspace</p>
@@ -227,7 +227,17 @@ const DashboardPage = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Access Level</span>
-                                                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#5865F2', background: 'rgba(88,101,242,0.1)', padding: '4px 10px', borderRadius: '6px' }}>{userRole}</span>
+                                                <span style={{
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: '950',
+                                                    color: userRole === 'OWNER' ? '#ff4b2b' : (userRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
+                                                    background: 'rgba(255,255,255,0.03)',
+                                                    padding: '5px 12px',
+                                                    borderRadius: '8px',
+                                                    letterSpacing: '0.5px'
+                                                }}>
+                                                    {userRole.toUpperCase()}
+                                                </span>
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Sync Status</span>

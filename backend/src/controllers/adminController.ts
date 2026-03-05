@@ -184,9 +184,13 @@ export const getStats = async (req: Request, res: Response) => {
                 UNION ALL
                 SELECT date(date, '+1 day') FROM days WHERE date < date('now')
             )
-            SELECT d.date, COUNT(up.id) as sales
+            SELECT 
+                d.date, 
+                COUNT(up.id) as sales,
+                COALESCE(SUM(pl.price), 0) as revenue
             FROM days d
             LEFT JOIN user_products up ON date(up.assigned_at) = d.date
+            LEFT JOIN plans pl ON up.plan_id = pl.id
             GROUP BY d.date
             ORDER BY d.date ASC
         `).all() as any[];
@@ -200,7 +204,7 @@ export const getStats = async (req: Request, res: Response) => {
             totalSales: totalSales.count,
             activeLicenses: activeLicenses.count,
             monthlySales: monthlySales.count,
-            chartData: chartData.map(d => d.sales)
+            chartData: chartData.map(d => ({ date: d.date, sales: d.sales, revenue: d.revenue }))
         });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };

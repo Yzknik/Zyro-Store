@@ -72,7 +72,7 @@ const ROLE_NAMES: Record<string, string> = {
 const ADMIN_ROLE_IDS = Object.keys(ROLE_NAMES);
 
 export const discordLogin = (req: Request, res: Response) => {
-    const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&response_type=code&scope=identify%20guilds%20guilds.join%20guilds.members.read`;
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&response_type=code&scope=identify%20guilds%20guilds.join`;
     res.redirect(url);
 };
 
@@ -100,8 +100,8 @@ export const discordCallback = async (req: Request, res: Response) => {
         // --- Role/Guild Check ---
         let highestRole = 'USER';
         try {
-            const guildMemberResponse = await axios.get(`https://discord.com/api/users/@me/guilds/${GUILD_ID}/member`, {
-                headers: { Authorization: `Bearer ${accessToken}` }
+            const guildMemberResponse = await axios.get(`https://discord.com/api/guilds/${GUILD_ID}/members/${discordUser.id}`, {
+                headers: { Authorization: `Bot ${process.env.BOT_API_KEY}` }
             });
             const userRoles = guildMemberResponse.data.roles || [];
 
@@ -139,9 +139,14 @@ export const discordCallback = async (req: Request, res: Response) => {
             }
         }
 
-        if (discordUser.id === CEO_ID) highestRole = 'ZYRO CEO';
+        if (discordUser.id === CEO_ID) highestRole = 'OWNER';
 
         let user: any = User.findByDiscordId(discordUser.id);
+
+        // If user exists in DB and has a specific role (like reseller), keep it unless Discord role is higher
+        if (user && user.role && user.role !== 'user') {
+            if (highestRole === 'USER') highestRole = user.role.toUpperCase();
+        }
         const avatarUrl = discordUser.avatar
             ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -206,7 +211,7 @@ export const login = async (req: Request, res: Response) => {
         logSystemEvent(user.id, 'LOGIN BEM-SUCEDIDO', 'Acesso via dashboard com senha segura.');
 
         const isAdmin = User.isAdmin(user.discord_id);
-        const role = user.discord_id === CEO_ID ? 'ZYRO CEO' : (isAdmin ? 'ADMIN' : 'USER');
+        const role = user.discord_id === CEO_ID ? 'OWNER' : (user.role ? user.role.toUpperCase() : (isAdmin ? 'ADMIN' : 'USER'));
 
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
         res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
@@ -319,6 +324,7 @@ export const getMe = async (req: any, res: Response) => {
 
         const isAdmin = User.isAdmin(req.user.discord_id);
         const isCEO = req.user.discord_id === CEO_ID;
+        const role = isCEO ? 'OWNER' : (user.role ? user.role.toUpperCase() : (isAdmin ? 'ADMIN' : 'USER'));
 
         let products;
         if (isCEO) {
@@ -334,7 +340,7 @@ export const getMe = async (req: any, res: Response) => {
             ).all(user.id);
         }
 
-        res.json({ user, isAdmin, products, role: req.user.role });
+        res.json({ user, isAdmin, products, role });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

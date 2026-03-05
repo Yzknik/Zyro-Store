@@ -7,7 +7,7 @@ import axios from 'axios'
 import API_URL from '../api'
 
 const ResellerPage = () => {
-    const { user, loading: authLoading } = useAuth()
+    const { user, role, loading: authLoading } = useAuth()
     const [stats, setStats] = useState({ balance: 0, total_keys: 0, total_spent: 0 })
     const [recentSales, setRecentSales] = useState([])
     const [products, setProducts] = useState([])
@@ -56,7 +56,7 @@ const ResellerPage = () => {
     }
 
     if (authLoading) return null
-    if (!user || (user.role !== 'reseller' && user.role !== 'admin' && user.discord_id !== '1249488594414997676')) {
+    if (!user || (role !== 'RESELLER' && role !== 'ADMIN' && role !== 'OWNER' && user.discord_id !== '1249488594414997676')) {
         return <Navigate to="/dashboard" />
     }
 

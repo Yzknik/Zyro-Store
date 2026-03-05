@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 
 const Navbar = ({ isMenuOpen, setIsMenuOpen }) => {
   const { lang, setLang, t } = useContext(LangContext)
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, role, logout } = useAuth()
   const [hoveredLink, setHoveredLink] = useState(null)
 
   const navLinks = [
@@ -14,7 +14,7 @@ const Navbar = ({ isMenuOpen, setIsMenuOpen }) => {
     { label: 'COMMUNITY', href: 'https://discord.gg/zyrogg' },
     { label: t.nav.tos, href: '/tos', type: 'link' },
     ...(isAdmin ? [{ label: 'ADMIN', href: '/admin', type: 'link' }] : []),
-    ...(user && (user.role === 'reseller' || user.role === 'admin' || user.discord_id === '1249488594414997676') ? [{ label: 'RESELLER', href: '/reseller', type: 'link' }] : [])
+    ...(user && (role === 'RESELLER' || isAdmin || user.discord_id === '1249488594414997676') ? [{ label: 'RESELLER', href: '/reseller', type: 'link' }] : [])
   ]
 
   return (
@@ -79,13 +79,43 @@ const Navbar = ({ isMenuOpen, setIsMenuOpen }) => {
             </button>
 
             {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <Link to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-                  <img src={user.avatar} alt={user.username} style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--color-border)' }} />
-                  <span style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '700' }}>{user.username.toUpperCase()}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
+                <Link to="/dashboard" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  textDecoration: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  transition: '0.3s'
+                }}>
+                  <div style={{ position: 'relative' }}>
+                    <img src={user.avatar} alt={user.username} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <div style={{
+                      position: 'absolute', bottom: '-2px', right: '-2px', width: '10px', height: '10px',
+                      background: '#22c55e', borderRadius: '50%', border: '2px solid #050505',
+                      boxShadow: '0 0 10px #22c55e'
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: '900', letterSpacing: '0.5px' }}>
+                      {user.username.toUpperCase()}
+                    </span>
+                    <span style={{
+                      fontSize: '0.6rem',
+                      fontWeight: '950',
+                      color: role === 'OWNER' ? '#ff4b2b' : (role === 'RESELLER' ? '#22c55e' : '#3366ff'),
+                      opacity: 0.8,
+                      letterSpacing: '1px'
+                    }}>
+                      {role}
+                    </span>
+                  </div>
                 </Link>
-                <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'none' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+                <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.3s' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
                 </button>
               </div>
             ) : (

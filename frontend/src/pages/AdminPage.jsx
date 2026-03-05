@@ -58,22 +58,28 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
     const chartTop = 10;   // top padding in SVG units
     const chartBot = 88;   // bottom of chart area in SVG units
 
+    // If data is array of objects, extract the values
+    const isRich = data.length > 0 && typeof data[0] === 'object';
+    const mainData = isRich ? data.map(d => d.sales) : data;
+    const revData = isRich ? data.map(d => d.revenue) : [];
+
     // Map value → SVG Y coordinate
     const toY = (v) => chartBot - (v / maxVal) * (chartBot - chartTop);
 
     // SVG polyline points string (x in %, y in SVG units)
-    const pts = data.map((v, i) => `${(i / (data.length - 1)) * 100},${toY(v)}`).join(' ');
+    const pts = mainData.map((v, i) => `${(i / (mainData.length - 1)) * 100},${toY(v)}`).join(' ');
 
     // Day labels
-    const days = data.map((_, i) => {
+    const days = mainData.map((_, i) => {
+        if (isRich && data[i].date) return new Date(data[i].date + 'T12:00:00');
         const d = new Date();
-        d.setDate(d.getDate() - (data.length - 1 - i));
+        d.setDate(d.getDate() - (mainData.length - 1 - i));
         return d;
     });
 
     // Dot overlay: positions in % of the container so no SVG distortion
     const dotTopPct = (v) => ((toY(v)) / H) * 100 + '%';   // maps SVG Y → CSS top%
-    const dotLeftPct = (i) => `${(i / (data.length - 1)) * 100}%`;
+    const dotLeftPct = (i) => `${(i / (mainData.length - 1)) * 100}%`;
 
     return (
         <div style={{ width: '100%', position: 'relative', marginTop: '30px' }}>
@@ -92,7 +98,7 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
                     </defs>
                     {/* filled area */}
                     <path
-                        d={`M0,${H} L0,${toY(data[0])} L${pts} L100,${H} Z`}
+                        d={`M0,${H} L0,${toY(mainData[0])} L${pts} L100,${H} Z`}
                         fill={`url(#cg-${color.replace('#', '')})`}
                     />
                     {/* line — vectorEffect prevents stroke-width from being squashed */}
@@ -109,7 +115,7 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
                 </svg>
 
                 {/* HTML dots — rendered on top, use CSS % positioning so they're never distorted */}
-                {data.map((v, i) => (
+                {mainData.map((v, i) => (
                     <div
                         key={i}
                         onMouseEnter={() => setHovered(i)}
@@ -134,39 +140,47 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
 
                 {/* Tooltip */}
                 {hovered !== null && (() => {
-                    const isRight = hovered > data.length * 0.6;
+                    const isRight = hovered > mainData.length * 0.6;
                     return (
                         <div style={{
                             position: 'absolute',
                             left: dotLeftPct(hovered),
-                            top: dotTopPct(data[hovered]),
+                            top: dotTopPct(mainData[hovered]),
                             transform: `translate(${isRight ? 'calc(-100% - 12px)' : '12px'}, -50%)`,
                             background: 'rgba(5, 8, 18, 0.97)',
                             border: `1px solid ${color}30`,
                             borderRadius: '14px',
-                            padding: '10px 15px',
+                            padding: '12px 18px',
                             pointerEvents: 'none',
                             zIndex: 20,
                             backdropFilter: 'blur(20px)',
                             boxShadow: `0 10px 30px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)`,
-                            minWidth: '130px',
+                            minWidth: '150px',
                             animation: 'fadeIn 0.12s ease',
                             whiteSpace: 'nowrap',
                         }}>
-                            <p style={{ margin: 0, fontSize: '0.58rem', fontWeight: '900', color: 'rgba(255,255,255,0.25)', letterSpacing: '1.5px', marginBottom: '5px' }}>
+                            <p style={{ margin: 0, fontSize: '0.6rem', fontWeight: '950', color: 'rgba(255,255,255,0.2)', letterSpacing: '1.5px', marginBottom: '8px' }}>
                                 {days[hovered]?.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()}
                             </p>
-                            <p style={{ margin: 0, fontSize: '1.6rem', fontWeight: '950', color: data[hovered] > 0 ? color : 'rgba(255,255,255,0.15)', lineHeight: 1, letterSpacing: '-1px' }}>
-                                {data[hovered]}
-                            </p>
-                            <p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{label}</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                    <span style={{ fontSize: '1.5rem', fontWeight: '950', color: mainData[hovered] > 0 ? color : 'rgba(255,255,255,0.1)' }}>{mainData[hovered]}</span>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'rgba(255,255,255,0.4)' }}>VENDAS</span>
+                                </div>
+                                {isRich && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '5px' }}>
+                                        <span style={{ fontSize: '1.2rem', fontWeight: '950', color: '#22c55e' }}>R$ {revData[hovered].toFixed(2)}</span>
+                                        <span style={{ fontSize: '0.6rem', fontWeight: '800', color: 'rgba(255,255,255,0.3)' }}>ARRECADADO</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })()}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.58rem', color: 'rgba(255,255,255,0.18)', fontWeight: '900', letterSpacing: '1.5px' }}>
-                <span>ÚLTIMOS {data.length} DIAS</span>
+                <span>ÚLTIMOS {mainData.length} DIAS</span>
                 <span>HOJE</span>
             </div>
         </div>
@@ -799,65 +813,7 @@ const AdminPage = () => {
                         </div>
                     );
                 })()}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
-                        <div style={{ borderLeft: '4px solid #22c55e', paddingLeft: '20px' }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>GERENCIAMENTO DE REVENDEDORES</h2>
-                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Visualize e controle o saldo de crédito dos seus revendedores oficiais.</p>
-                        </div>
-                    </div>
 
-                    <div className="glass" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead style={{ background: 'rgba(255,255,255,0.02)', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}>
-                                <tr>
-                                    <th style={{ padding: '25px' }}>REVENDEDOR</th>
-                                    <th>DISCORD ID</th>
-                                    <th>SALDO ATUAL</th>
-                                    <th style={{ padding: '25px', textAlign: 'right' }}>AÇÕES</th>
-                                </tr>
-                            </thead>
-                            <tbody style={{ fontSize: '0.85rem', fontWeight: '700' }}>
-                                {users.filter(u => u.role === 'reseller').map(u => (
-                                    <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-                                        <td style={{ padding: '20px 25px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                            <img src={u.avatar} style={{ width: '40px', height: '40px', borderRadius: '12px' }} />
-                                            {u.username}
-                                        </td>
-                                        <td style={{ opacity: 0.4 }}>{u.discord_id}</td>
-                                        <td style={{ color: '#22c55e', fontWeight: '900' }}>R$ {u.reseller_balance?.toFixed(2)}</td>
-                                        <td style={{ padding: '20px 25px', textAlign: 'right' }}>
-                                            <button
-                                                onClick={() => {
-                                                    askInput(
-                                                        'DEFINIR SALDO',
-                                                        `Revendedor: ${u.username} | Saldo atual: R$ ${u.reseller_balance?.toFixed(2)}`,
-                                                        '#22c55e',
-                                                        'DEFINIR SALDO',
-                                                        async (amount) => {
-                                                            try {
-                                                                await axios.post(`${API_URL}/api/admin/users/${u.id}/set-reseller-balance`, { amount }, { withCredentials: true });
-                                                                notify('SALDO DEFINIDO!'); fetchUsers();
-                                                            } catch (err) { notify('Erro ao definir saldo', 'error'); }
-                                                        }
-                                                    );
-                                                }}
-                                                className="btn-primary"
-                                                style={{ padding: '8px 20px', fontSize: '0.7rem', background: '#22c55e' }}
-                                            >
-                                                SET SALDO
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {users.filter(u => u.role === 'reseller').length === 0 && (
-                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', opacity: 0.3 }}>Nenhum revendedor cadastrado. Promova alguém na aba USUÁRIOS.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                )}
 
                 {activeTab === 'users' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
