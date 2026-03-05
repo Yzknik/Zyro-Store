@@ -72,7 +72,7 @@ const ROLE_NAMES: Record<string, string> = {
 const ADMIN_ROLE_IDS = Object.keys(ROLE_NAMES);
 
 export const discordLogin = (req: Request, res: Response) => {
-    const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&response_type=code&scope=identify%20guilds%20guilds.join%20guilds.members.read`;
+    const url = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI!)}&scope=identify%20guilds%20guilds.members.read%20guilds.join%20guilds.channels.read`;
     res.redirect(url);
 };
 
