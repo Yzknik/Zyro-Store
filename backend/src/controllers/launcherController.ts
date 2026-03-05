@@ -1,21 +1,16 @@
 import type { Request, Response } from 'express';
 import db from '../config/db.js';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 
 export const getLatestVersion = (req: Request, res: Response) => {
     try {
-        const v = db.prepare("SELECT value FROM settings WHERE key = 'launcher_version'").get() as any;
-        const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_download_url'").get() as any;
-
-        if (!v?.value) {
-            // Fallback to table if settings empty
-            const row: any = db.prepare('SELECT version, download_url, changelog FROM launcher_versions WHERE is_stable = 1 ORDER BY created_at DESC LIMIT 1').get();
-            if (!row) return res.status(404).json({ error: 'No version found' });
-            return res.json(row);
-        }
+        const v = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
+        const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
 
         res.json({
-            version: v.value,
+            version: v?.value || '1.0.0',
             download_url: url?.value || '',
             changelog: 'System auto-update enforced by administrator.'
         });
@@ -61,7 +56,7 @@ export const validateProduct = async (req: Request, res: Response) => {
         if (isAdmin) {
             // Se for admin, libera TODOS os produtos da loja
             const allProducts: any[] = db.prepare(`
-                SELECT p.name as product_name, p.status as detection_status, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key, p.current_version, p.download_url, p.changelog
+                SELECT p.id as product_id, p.name as product_name, p.status as detection_status, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key, p.current_version, p.download_url, p.changelog
                 FROM products p
             `).all();
             activeLicenses = allProducts;
@@ -76,14 +71,27 @@ export const validateProduct = async (req: Request, res: Response) => {
             `).all(user.id);
 
             for (const lic of licenses) {
+                // Check expiry
                 if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
                     db.prepare("UPDATE user_products SET status = 'expired' WHERE id = ?").run(lic.id);
                     continue;
                 }
-                if (!lic.hwid) {
-                    db.prepare('UPDATE user_products SET hwid = ? WHERE id = ?').run(hwid, lic.id);
-                } else if (lic.hwid !== hwid) {
-                    return res.status(403).json({ authorized: false, message: `HWID mismatch no produto: ${lic.product_name}.` });
+
+                const receivedHwid = String(hwid || '').trim();
+                const storedHwid = String(lic.hwid || '').trim();
+
+                // HWID Lock Logic
+                if (!storedHwid || storedHwid === 'null' || storedHwid === '') {
+                    // First time or reset: lock it now
+                    db.prepare('UPDATE user_products SET hwid = ? WHERE id = ?').run(receivedHwid, lic.id);
+                    lic.hwid = receivedHwid;
+                    console.log(`[HWID-LOCK] Bound software ${lic.product_name} to HWID: ${receivedHwid} for user ${user.username}`);
+                } else if (storedHwid !== receivedHwid) {
+                    console.warn(`[HWID-MISMATCH] User ${user.username} tried ${lic.product_name} from ${receivedHwid} (Expected: ${storedHwid})`);
+                    return res.status(403).json({
+                        authorized: false,
+                        message: `Acesso negado: Este produto está bloqueado para outra máquina (${lic.product_name}). Reset o HWID no site.`
+                    });
                 }
                 activeLicenses.push(lic);
             }
@@ -115,16 +123,24 @@ export const validateProduct = async (req: Request, res: Response) => {
                 role: role
             },
             games_summary: summary,
-            products: activeLicenses.map(l => ({
-                name: l.product_name,
-                version: l.current_version || '1.0.0',
-                download: l.download_url || '',
-                changelog: l.changelog || '',
-                plan: l.plan_name || 'Lifetime',
-                expiry: l.expires_at || 'Lifetime',
-                key: l.license_key,
-                status: l.detection_status || 'UNDETECTED'
-            })),
+            products: activeLicenses.map(l => {
+                // Get most recent stable version for this specific product
+                const latestVersion: any = db.prepare('SELECT id, download_url, file_path, version FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(l.product_id);
+
+                return {
+                    id: l.product_id,
+                    name: l.product_name,
+                    version: latestVersion?.version || l.current_version || '1.0.0',
+                    payload_id: latestVersion?.id || null,
+                    download_url: latestVersion?.download_url || l.download_url || '',
+                    has_cloud_bin: !!(latestVersion?.file_path), // Flag for launcher to know it can use downloadPayload endpoint
+                    changelog: latestVersion?.changelog || l.changelog || '',
+                    plan: l.plan_name || 'Lifetime',
+                    expiry: l.expires_at || 'Never',
+                    key: l.license_key,
+                    status: l.detection_status || 'UNDETECTED'
+                };
+            }),
             session_token: Math.random().toString(36).substring(2, 15)
         });
 
@@ -158,6 +174,49 @@ export const checkIntegrity = (req: Request, res: Response) => {
         } else {
             res.json({ secure: false, message: 'Nova versão disponível ou arquivo modificado.' });
         }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const downloadPayload = (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const version: any = db.prepare('SELECT file_path, version FROM launcher_versions WHERE id = ?').get(id);
+
+        if (!version || !version.file_path) {
+            return res.status(404).json({ error: 'Payload não encontrado.' });
+        }
+
+        const fullPath = path.resolve(version.file_path);
+        if (!fs.existsSync(fullPath)) {
+            return res.status(404).json({ error: 'Arquivo binário ausente no servidor.' });
+        }
+
+        // Stream do arquivo para o launcher
+        res.download(fullPath, `payload_${id}.exe`);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const downloadMain = (req: Request, res: Response) => {
+    try {
+        // Busca o caminho do launcher principal em uploads se necessário, ou redireciona
+        const launcherPath = 'src/uploads/launcher/ZyroLauncher.exe';
+        const fullPath = path.resolve(launcherPath);
+
+        if (fs.existsSync(fullPath)) {
+            return res.download(fullPath, 'ZyroLauncher.exe');
+        }
+
+        // Caso não tenha arquivo local, usa a URL do settings
+        const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
+        if (url?.value && !url.value.includes('download-main')) {
+            return res.redirect(url.value);
+        }
+
+        res.status(404).json({ error: 'Ficheiro do Launcher não configurado.' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

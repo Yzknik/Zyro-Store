@@ -1,67 +1,81 @@
 import { useContext } from 'react'
 import { Link } from 'react-router-dom'
 import { LangContext } from '../App'
+import { motion } from 'framer-motion'
+import { Shield, Zap, Target, MessageSquare, Monitor, Users, ChevronRight } from 'lucide-react'
 
 const FeatureCard = ({ icon, title, desc, index }) => (
-  <div style={{
-    opacity: 0,
-    animation: 'fadeUp 0.8s ease forwards',
-    animationDelay: `${index * 0.1}s`,
-    height: '100%'
-  }}>
-    <div className="card" style={{ padding: '40px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  <motion.div
+    initial={{ opacity: 0, y: 30 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    transition={{ delay: index * 0.1, duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
+    style={{ height: '100%' }}
+  >
+    <div className="card" style={{ padding: '48px', height: '100%', display: 'flex', flexDirection: 'column', gap: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
       <div style={{
-        width: '40px',
-        height: '40px',
-        color: 'var(--color-primary)',
+        width: '50px',
+        height: '50px',
+        color: '#3366ff',
+        background: 'rgba(51, 102, 255, 0.08)',
+        borderRadius: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: '1px solid rgba(51, 102, 255, 0.2)'
       }}>
         {icon}
       </div>
       <div>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>{title}</h3>
-        <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>{desc}</p>
+        <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#fff', marginBottom: '12px', letterSpacing: '-0.5px' }}>{title}</h3>
+        <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.7', fontWeight: '400' }}>{desc}</p>
       </div>
     </div>
-  </div>
+  </motion.div>
 )
 
 const Features = () => {
   const { t } = useContext(LangContext)
 
   const icons = [
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>,
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>,
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>,
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+    <Shield size={24} />,
+    <Zap size={24} />,
+    <Target size={24} />,
+    <MessageSquare size={24} />,
+    <Monitor size={24} />,
+    <Users size={24} />
   ]
 
   return (
-    <section id="features" style={{ padding: '140px 0', background: '#050505' }}>
-      <div className="container-lg">
+    <section id="features" style={{ padding: '160px 0', background: '#050505', position: 'relative' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 40px' }}>
 
-        <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          style={{ textAlign: 'center', marginBottom: '100px' }}
+        >
           <span style={{
-            fontSize: '0.7rem',
-            fontWeight: '800',
-            color: 'var(--color-primary)',
-            letterSpacing: '0.2em',
+            fontSize: '0.75rem',
+            fontWeight: '900',
+            color: '#3366ff',
+            letterSpacing: '3px',
             textTransform: 'uppercase',
             display: 'block',
-            marginBottom: '16px'
+            marginBottom: '20px'
           }}>
-            ELITE FEATURES
+            {t.features.badge || 'PREMIUM TECHNOLOGY'}
           </span>
-          <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#fff' }}>
-            Engineered for Precision
+          <h2 className="title-ultra" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)' }}>
+            {t.features.title}
           </h2>
-        </div>
+        </motion.div>
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '24px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+          gap: '32px'
         }}>
           {t.features.items.map((f, i) => (
             <FeatureCard
@@ -74,19 +88,36 @@ const Features = () => {
           ))}
         </div>
 
-        {/* CTA Section */}
-        <div style={{ marginTop: '100px', textAlign: 'center' }}>
-          <div className="card" style={{
-            padding: '60px',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
-            maxWidth: '800px',
-            margin: '0 auto'
+        {/* Professional CTA Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          style={{ marginTop: '140px', textAlign: 'center' }}
+        >
+          <div className="glass" style={{
+            padding: '80px 40px',
+            borderRadius: '40px',
+            maxWidth: '1000px',
+            margin: '0 auto',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            <h3 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '16px' }}>Ready to elevate your game?</h3>
-            <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: '32px' }}>Join over 10,000 players already using Zyro.</p>
-            <Link to="/products" className="btn-primary" style={{ padding: '16px 40px' }}>Explore Catalog</Link>
+            <div className="mesh-bg" style={{ top: '-50%', left: '-20%', opacity: 0.2 }} />
+
+            <h3 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: '900', color: '#fff', marginBottom: '20px', letterSpacing: '-1px' }}>{t.features.ctaTitle || 'Ready to Evolve?'}</h3>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem', marginBottom: '48px', maxWidth: '600px', marginInline: 'auto' }}>
+              {t.features.ctaSubtitle || 'Join the largest community of elite players and experience the future of software execution.'}
+            </p>
+
+            <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
+              <Link to="/products" className="btn-premium btn-primary-gradient" style={{ textDecoration: 'none' }}>
+                {t.features.ctaButton || 'BROWSE STORE'}
+                <ChevronRight size={18} />
+              </Link>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
       </div>
     </section>

@@ -1,13 +1,89 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
+import { LangContext } from '../App'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
+import { useNotification } from '../context/NotificationContext'
 import { Navigate } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
 
+const WithdrawModal = ({ balance, isOpen, onClose, onRefresh }) => {
+    const [amount, setAmount] = useState('');
+    const [pixKey, setPixKey] = useState('');
+    const [loading, setLoading] = useState(false);
+    const { notify } = useNotification();
+    const { t } = useContext(LangContext);
+
+    const handleWithdraw = async () => {
+        if (!amount || !pixKey) return notify('Preencha os campos obrigatorios.', 'error');
+        if (parseFloat(amount) > balance) return notify('Saldo insuficiente.', 'error');
+
+        setLoading(true);
+        try {
+            await axios.post(`${API_URL}/api/payment/withdraw`, {
+                amount: parseFloat(amount),
+                pixKey
+            }, { withCredentials: true });
+
+            notify('Solicitação de saque enviada com sucesso!', 'success');
+            onRefresh();
+            onClose();
+        } catch (err) {
+            notify(err.response?.data?.error || 'Erro ao processar saque.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', padding: '20px' }} onClick={onClose}>
+            <div style={{ background: '#080c14', border: '1px solid rgba(255,255,255,0.05)', padding: '40px', borderRadius: '30px', width: '100%', maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '950', marginBottom: '10px' }}>{t.nav.requestWithdraw}</h3>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem', marginBottom: '30px' }}>{t.nav.minAmount}</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+                    <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: '900', color: '#fff', opacity: 0.3, letterSpacing: '1px', marginBottom: '10px', display: 'block' }}>{t.nav.withdrawAmount}</label>
+                        <input
+                            type="number"
+                            placeholder="0.00"
+                            value={amount}
+                            onChange={e => setAmount(e.target.value)}
+                            style={{ width: '100%', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', color: '#fff', borderRadius: '15px', fontWeight: '700' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: '900', color: '#fff', opacity: 0.3, letterSpacing: '1px', marginBottom: '10px', display: 'block' }}>{t.nav.pixKey}</label>
+                        <input
+                            placeholder="..."
+                            value={pixKey}
+                            onChange={e => setPixKey(e.target.value)}
+                            style={{ width: '100%', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', color: '#fff', borderRadius: '15px', fontWeight: '700' }}
+                        />
+                    </div>
+
+                    <button
+                        className="btn-primary"
+                        onClick={handleWithdraw}
+                        disabled={loading}
+                        style={{ height: '55px', borderRadius: '15px', marginTop: '10px', fontWeight: '900' }}
+                    >
+                        {loading ? '...' : t.nav.confirmWithdraw}
+                    </button>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontWeight: '700', cursor: 'pointer', fontSize: '0.8rem' }}>CANCEL</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ResellerPage = () => {
+    const { t } = useContext(LangContext);
     const { user, role, loading: authLoading } = useAuth()
+    const { notify } = useNotification()
     const [stats, setStats] = useState({ balance: 0, total_keys: 0, total_spent: 0 })
     const [recentSales, setRecentSales] = useState([])
     const [products, setProducts] = useState([])
@@ -15,6 +91,7 @@ const ResellerPage = () => {
     const [selectedPlan, setSelectedPlan] = useState(null)
     const [buying, setBuying] = useState(false)
     const [newKey, setNewKey] = useState(null)
+    const [withdrawOpen, setWithdrawOpen] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -49,7 +126,7 @@ const ResellerPage = () => {
             setNewKey(res.data.license_key)
             fetchStats()
         } catch (err) {
-            alert(err.response?.data?.error || 'Erro ao comprar key')
+            notify(err.response?.data?.error || 'Erro ao comprar key', 'error')
         } finally {
             setBuying(false)
         }
@@ -63,6 +140,7 @@ const ResellerPage = () => {
     return (
         <div style={{ minHeight: '100vh', background: '#050505', color: '#fff' }}>
             <Navbar />
+            <WithdrawModal balance={stats.balance} isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} onRefresh={fetchStats} />
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', maxWidth: '1100px', margin: '0 auto', paddingLeft: '20px', paddingRight: '20px' }}>
 
@@ -71,9 +149,31 @@ const ResellerPage = () => {
                         <h1 style={{ fontSize: '2.5rem', fontWeight: '950', letterSpacing: '-1px' }}>Reseller Hub</h1>
                         <p style={{ color: 'rgba(255,255,255,0.4)', marginTop: '5px' }}>Manage your inventory and balance</p>
                     </div>
-                    <div className="card" style={{ padding: '20px 30px', background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
-                        <p style={{ fontSize: '0.7rem', fontWeight: '800', color: '#22c55e', marginBottom: '5px', letterSpacing: '1px' }}>CURRENT BALANCE</p>
-                        <h2 style={{ fontSize: '1.8rem', fontWeight: '950', color: '#fff' }}>R$ {stats.balance?.toFixed(2) || '0.00'}</h2>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        <div className="card" style={{ padding: '20px 30px', background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                            <p style={{ fontSize: '0.7rem', fontWeight: '800', color: '#22c55e', marginBottom: '5px', letterSpacing: '1px' }}>CURRENT BALANCE</p>
+                            <h2 style={{ fontSize: '1.8rem', fontWeight: '950', color: '#fff' }}>R$ {stats.balance?.toFixed(2) || '0.00'}</h2>
+                        </div>
+                        <button
+                            onClick={() => setWithdrawOpen(true)}
+                            className="glass"
+                            style={{
+                                padding: '20px',
+                                borderRadius: '20px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontWeight: '900',
+                                fontSize: '0.7rem',
+                                letterSpacing: '1px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}
+                        >
+                            <Zap size={16} color="#22c55e" />
+                            {t.nav.withdraw?.toUpperCase()}
+                        </button>
                     </div>
                 </div>
 
@@ -170,7 +270,7 @@ const ResellerPage = () => {
                                         <p style={{ fontSize: '0.75rem', fontWeight: '700', color: '#22c55e', marginBottom: '10px' }}>KEY GENERATED SUCCESSFULLY!</p>
                                         <code style={{ fontSize: '1.2rem', fontWeight: '950', letterSpacing: '2px', color: '#fff' }}>{newKey}</code>
                                         <button
-                                            onClick={() => { navigator.clipboard.writeText(newKey); alert('Key copied!'); }}
+                                            onClick={() => { navigator.clipboard.writeText(newKey); notify('Chave copiada com sucesso!'); }}
                                             style={{ display: 'block', margin: '15px auto 0', background: 'none', border: 'none', color: '#22c55e', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
                                         >
                                             COPY KEY
@@ -221,7 +321,7 @@ const ResellerPage = () => {
                         <div className="card" style={{ padding: '30px', background: 'linear-gradient(135deg, rgba(51, 102, 255, 0.05) 0%, transparent 100%)' }}>
                             <h4 style={{ fontSize: '0.9rem', fontWeight: '800', marginBottom: '15px' }}>Top-up Balance</h4>
                             <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5', marginBottom: '20px' }}>To add more funds to your reseller account, please contact an administrator.</p>
-                            <a href="https://discord.gg/zyrostore" target="_blank" className="btn-outline" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '12px' }}>CONTACT ADMIN</a>
+                            <a href="https://discord.gg/zyrogg" target="_blank" className="btn-outline" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '12px' }}>CONTACT ADMIN</a>
                         </div>
                     </div>
 

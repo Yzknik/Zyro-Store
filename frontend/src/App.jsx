@@ -11,6 +11,8 @@ import ResellerPage from './pages/ResellerPage'
 import ErrorPage from './pages/ErrorPage'
 import { translations } from './i18n'
 import { AuthProvider } from './context/AuthContext'
+import { NotificationProvider } from './context/NotificationContext'
+import { ModalProvider } from './context/ModalContext'
 
 export const LangContext = createContext({ lang: 'pt', t: translations.pt })
 
@@ -101,29 +103,33 @@ function App() {
   const t = translations[lang]
 
   return (
-    <AuthProvider>
-      <LangContext.Provider value={{ lang, setLang, t }}>
-        <BrowserRouter>
-          <ScrollToTop />
-          <ScrollReveal />
-          <CustomCursor />
-          <MouseSpotlight />
-          <div style={{ background: '#080c14', minHeight: '100vh', position: 'relative' }}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/tos" element={<TosPage />} />
-              <Route path="/verified" element={<VerifiedPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/reseller" element={<ResellerPage />} />
-              <Route path="*" element={<ErrorPage />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </LangContext.Provider>
-    </AuthProvider>
+    <NotificationProvider>
+      <ModalProvider>
+        <AuthProvider>
+          <LangContext.Provider value={{ lang, setLang, t }}>
+            <BrowserRouter>
+              <ScrollToTop />
+              <ScrollReveal />
+              <CustomCursor />
+              <MouseSpotlight />
+              <div style={{ background: '#080c14', minHeight: '100vh', position: 'relative' }}>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/tos" element={<TosPage />} />
+                  <Route path="/verified" element={<VerifiedPage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/reseller" element={<ResellerPage />} />
+                  <Route path="*" element={<ErrorPage />} />
+                </Routes>
+              </div>
+            </BrowserRouter>
+          </LangContext.Provider>
+        </AuthProvider>
+      </ModalProvider>
+    </NotificationProvider>
   )
 }
 

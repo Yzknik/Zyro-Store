@@ -3,47 +3,13 @@ import { LangContext } from '../App'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
+import { useNotification } from '../context/NotificationContext'
+import { useModal } from '../context/ModalContext'
 import { Navigate } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
 
-const Notification = ({ message, type, onClose }) => {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 4000)
-        return () => clearTimeout(timer)
-    }, [onClose])
-    return (
-        <div style={{
-            position: 'fixed', bottom: '30px', right: '30px', zIndex: 9999,
-            background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)',
-            borderLeft: `4px solid ${type === 'error' ? '#ef4444' : '#3b82f6'}`,
-            padding: '16px 24px', borderRadius: '12px', color: '#fff',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
-            display: 'flex', alignItems: 'center', gap: '12px',
-            animation: 'slideIn 0.6s var(--curve-bounce)'
-        }}>
-            <style>{`@keyframes slideIn { from { transform: translateX(100%) scale(0.9); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }`}</style>
-            <div style={{
-                width: '24px', height: '24px', borderRadius: '50%',
-                background: type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-                {type === 'error' ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
-                )}
-            </div>
-            <div>
-                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700' }}>{type === 'error' ? 'ERRO' : 'SUCESSO'}</p>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>{message}</p>
-            </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '4px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-            </button>
-        </div>
-    )
-}
+// ActivityChart code stays...
 
 const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
     const [hovered, setHovered] = useState(null);
@@ -53,15 +19,15 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
         </div>
     );
 
-    const maxVal = Math.max(...data, 1);
+    // Extract only values for calculations
+    const isRich = data.length > 0 && typeof data[0] === 'object';
+    const mainData = isRich ? data.map(d => d.sales || 0) : data;
+    const revData = isRich ? data.map(d => d.revenue || 0) : [];
+
+    const maxVal = Math.max(...mainData, 1);
     const H = 100; // SVG coordinate height
     const chartTop = 10;   // top padding in SVG units
     const chartBot = 88;   // bottom of chart area in SVG units
-
-    // If data is array of objects, extract the values
-    const isRich = data.length > 0 && typeof data[0] === 'object';
-    const mainData = isRich ? data.map(d => d.sales) : data;
-    const revData = isRich ? data.map(d => d.revenue) : [];
 
     // Map value → SVG Y coordinate
     const toY = (v) => chartBot - (v / maxVal) * (chartBot - chartTop);
@@ -188,159 +154,6 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
 };
 
 
-const ConfirmModal = ({ isOpen, title, message, confirmText = "CONFIRMAR", onConfirm, onCancel }) => {
-    if (!isOpen) return null;
-    return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-            animation: 'fadeIn 0.3s ease'
-        }}>
-            <style>{`
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes pop { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-            `}</style>
-            <div style={{
-                background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)',
-                borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '420px',
-                textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                animation: 'pop 0.4s var(--curve-bounce)'
-            }}>
-                <div style={{
-                    width: '60px', height: '60px', background: 'rgba(51, 102, 255, 0.1)',
-                    borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    margin: '0 auto 25px'
-                }}>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3366ff" strokeWidth="2.5"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                </div>
-                <h2 style={{ fontSize: '1.4rem', marginBottom: '12px', fontWeight: '800', letterSpacing: '-0.5px' }}>{title}</h2>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '35px' }}>{message}</p>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={onCancel} style={{
-                        flex: 1, padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)',
-                        background: 'transparent', color: '#fff', fontWeight: '700', cursor: 'pointer',
-                        transition: 'all 0.3s'
-                    }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>CANCELAR</button>
-                    <button onClick={onConfirm} style={{
-                        flex: 1, padding: '16px', borderRadius: '14px', border: 'none',
-                        background: '#3366ff', color: '#fff', fontWeight: '700', cursor: 'pointer',
-                        boxShadow: '0 10px 20px -5px rgba(51, 102, 255, 0.3)',
-                        transition: 'all 0.3s'
-                    }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>{confirmText}</button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-const InputModal = ({ isOpen, title, subtitle, placeholder, icon, accentColor = '#22c55e', confirmText = 'CONFIRMAR', onConfirm, onCancel }) => {
-    const [value, setValue] = useState('');
-    if (!isOpen) return null;
-    const handleConfirm = () => {
-        if (!value || isNaN(value) || parseFloat(value) <= 0) return;
-        onConfirm(parseFloat(value));
-        setValue('');
-    };
-    const handleCancel = () => { onCancel(); setValue(''); };
-    return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.87)', backdropFilter: 'blur(12px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001,
-            animation: 'fadeIn 0.25s ease'
-        }} onClick={e => { if (e.target === e.currentTarget) handleCancel(); }}>
-            <div style={{
-                background: 'linear-gradient(135deg, #0d1525 0%, #0a0f1e 100%)',
-                border: `1px solid ${accentColor}22`,
-                borderRadius: '28px', padding: '42px', width: '90%', maxWidth: '440px',
-                boxShadow: `0 40px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)`,
-                animation: 'pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-            }}>
-                {/* Icon */}
-                <div style={{
-                    width: '65px', height: '65px',
-                    background: `${accentColor}15`,
-                    border: `1px solid ${accentColor}30`,
-                    borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    margin: '0 auto 28px',
-                    boxShadow: `0 8px 25px -5px ${accentColor}30`
-                }}>
-                    {icon || <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>}
-                </div>
-
-                {/* Title */}
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '-0.5px', marginBottom: '8px', textAlign: 'center' }}>{title}</h2>
-                {subtitle && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', textAlign: 'center', marginBottom: '30px', lineHeight: '1.5' }}>{subtitle}</p>}
-
-                {/* Input */}
-                <div style={{ position: 'relative', marginBottom: '24px' }}>
-                    <span style={{
-                        position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)',
-                        fontSize: '1rem', fontWeight: '900', color: accentColor, opacity: 0.8
-                    }}>R$</span>
-                    <input
-                        type="number"
-                        autoFocus
-                        value={value}
-                        onChange={e => setValue(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); if (e.key === 'Escape') handleCancel(); }}
-                        placeholder={placeholder || '0.00'}
-                        style={{
-                            width: '100%',
-                            background: 'rgba(255,255,255,0.03)',
-                            border: `1px solid ${value && !isNaN(value) && parseFloat(value) > 0 ? accentColor + '55' : 'rgba(255,255,255,0.08)'}`,
-                            padding: '18px 20px 18px 50px',
-                            borderRadius: '16px',
-                            color: '#fff',
-                            fontSize: '1.4rem',
-                            fontWeight: '900',
-                            outline: 'none',
-                            transition: '0.2s',
-                            boxSizing: 'border-box',
-                            boxShadow: value && !isNaN(value) && parseFloat(value) > 0 ? `0 0 0 3px ${accentColor}15` : 'none'
-                        }}
-                    />
-                </div>
-
-                {/* Buttons */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button
-                        onClick={handleCancel}
-                        style={{
-                            flex: 1, padding: '16px', borderRadius: '14px',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.5)',
-                            fontWeight: '800', cursor: 'pointer', fontSize: '0.8rem', letterSpacing: '1px',
-                            transition: '0.2s'
-                        }}
-                        onMouseOver={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
-                        onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
-                    >
-                        CANCELAR
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        disabled={!value || isNaN(value) || parseFloat(value) <= 0}
-                        style={{
-                            flex: 2, padding: '16px', borderRadius: '14px', border: 'none',
-                            background: value && !isNaN(value) && parseFloat(value) > 0
-                                ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
-                                : 'rgba(255,255,255,0.05)',
-                            color: value && !isNaN(value) && parseFloat(value) > 0 ? '#fff' : 'rgba(255,255,255,0.2)',
-                            fontWeight: '950', cursor: value && !isNaN(value) && parseFloat(value) > 0 ? 'pointer' : 'not-allowed',
-                            fontSize: '0.85rem', letterSpacing: '1px',
-                            boxShadow: value && !isNaN(value) && parseFloat(value) > 0 ? `0 8px 20px -5px ${accentColor}55` : 'none',
-                            transition: '0.3s'
-                        }}
-                    >
-                        {confirmText}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const ROLES = [
     { value: 'user', label: 'USER', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.04)', icon: '👤', desc: 'Acesso padrão ao painel' },
@@ -432,11 +245,11 @@ const RoleModal = ({ isOpen, username, avatar, currentRole, onConfirm, onCancel 
 
 const AdminPage = () => {
     const { user, isAdmin, loading: authLoading } = useAuth()
+    const { notify } = useNotification()
+    const { askConfirm, askInput } = useModal()
     const CEO_ID = '1249488594414997676'
     const isOwner = user?.discord_id === CEO_ID
     const [activeTab, setActiveTab] = useState('dashboard')
-    const [notification, setNotification] = useState(null)
-    const notify = (msg, type = 'success') => setNotification({ msg, type })
 
     const [stats, setStats] = useState({ users: 0, discordMembers: 0, products: 0, totalSales: 0, activeLicenses: 0, monthlySales: 0, chartData: [] })
     const [products, setProducts] = useState([])
@@ -458,17 +271,8 @@ const AdminPage = () => {
     const [localSettings, setLocalSettings] = useState({})
 
     const [versionList, setVersionList] = useState([])
+    const [versionFile, setVersionFile] = useState(null)
     const [newVersion, setNewVersion] = useState({ product_id: '', version: '', download_url: '', changelog: '', is_stable: true })
-
-    const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', onConfirm: () => { } })
-    const askConfirm = (title, message, confirmText, action) => {
-        setConfirmConfig({ isOpen: true, title, message, confirmText, onConfirm: () => { action(); setConfirmConfig(prev => ({ ...prev, isOpen: false })) } })
-    }
-
-    const [inputConfig, setInputConfig] = useState({ isOpen: false, title: '', subtitle: '', accentColor: '#22c55e', confirmText: 'CONFIRMAR', onConfirm: () => { } })
-    const askInput = (title, subtitle, accentColor, confirmText, onConfirm) => {
-        setInputConfig({ isOpen: true, title, subtitle, accentColor, confirmText, onConfirm: (val) => { onConfirm(val); setInputConfig(prev => ({ ...prev, isOpen: false })) } })
-    }
 
     const [roleModal, setRoleModal] = useState({ isOpen: false, user: null })
     const openRoleModal = (user) => setRoleModal({ isOpen: true, user })
@@ -632,9 +436,24 @@ const AdminPage = () => {
     const handleCreateVersion = async (e) => {
         e.preventDefault()
         try {
-            await axios.post(`${API_URL}/api/admin/versions`, newVersion, { withCredentials: true })
-            setNewVersion({ product_id: '', version: '', download_url: '', changelog: '', is_stable: true })
-            fetchVersions(); notify('VERSÃO PUBLICADA!')
+            const formData = new FormData();
+            formData.append('product_id', newVersion.product_id);
+            formData.append('version', newVersion.version);
+            formData.append('download_url', newVersion.download_url);
+            formData.append('changelog', newVersion.changelog);
+            formData.append('is_stable', newVersion.is_stable);
+            if (versionFile) formData.append('binary', versionFile);
+
+            await axios.post(`${API_URL}/api/admin/versions`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true
+            });
+
+            setNewVersion({ product_id: '', version: '', download_url: '', changelog: '', is_stable: true });
+            setVersionFile(null);
+            if (e.target) e.target.reset();
+
+            fetchVersions(); notify('VERSÃO PUBLICADA!');
         } catch (err) { notify('ERRO AO PUBLICAR VERSÃO', 'error') }
     }
 
@@ -651,9 +470,6 @@ const AdminPage = () => {
     return (
         <div style={{ minHeight: '100vh', background: '#080c14', color: '#fff' }}>
             <Navbar />
-            {notification && <Notification message={notification.msg} type={notification.type} onClose={() => setNotification(null)} />}
-            <ConfirmModal {...confirmConfig} onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} />
-            <InputModal {...inputConfig} onCancel={() => setInputConfig(prev => ({ ...prev, isOpen: false }))} />
             <RoleModal
                 isOpen={roleModal.isOpen}
                 username={roleModal.user?.username}
@@ -946,7 +762,16 @@ const AdminPage = () => {
                                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                                 <input required type="text" placeholder="Versão (ex: v1.0.4)" className="input" value={newVersion.version} onChange={e => setNewVersion({ ...newVersion, version: e.target.value })} />
-                                <input required type="url" placeholder="Link de Download" className="input" value={newVersion.download_url} onChange={e => setNewVersion({ ...newVersion, download_url: e.target.value })} />
+                                <input type="url" placeholder="Link de Download (Opcional se subir arquivo)" className="input" value={newVersion.download_url} onChange={e => setNewVersion({ ...newVersion, download_url: e.target.value })} />
+
+                                <div style={{ border: '2px dashed rgba(255,255,255,0.06)', borderRadius: '15px', padding: '20px', textAlign: 'center', transition: '0.3s' }}>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: versionFile ? '#22c55e' : 'rgba(255,255,255,0.3)', letterSpacing: '1px' }}>
+                                        {versionFile ? `FILE: ${versionFile.name.toUpperCase()}` : 'SUBIR BINÁRIO (.EXE / .BIN)'}
+                                    </p>
+                                    <input type="file" onChange={e => setVersionFile(e.target.files[0])} style={{ position: 'absolute', opacity: 0, cursor: 'pointer', height: '40px', width: '200px', transform: 'translateX(-100px)' }} />
+                                    {!versionFile && <p style={{ margin: 0, fontSize: '0.6rem', color: 'rgba(255,255,255,0.15)', marginTop: '5px' }}>O launcher baixará este arquivo da nuvem automaticamente.</p>}
+                                </div>
+
                                 <textarea placeholder="O que mudou? (Changelog)" className="input" style={{ minHeight: '100px' }} value={newVersion.changelog} onChange={e => setNewVersion({ ...newVersion, changelog: e.target.value })} />
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', cursor: 'pointer' }}>
                                     <input type="checkbox" checked={newVersion.is_stable} onChange={e => setNewVersion({ ...newVersion, is_stable: e.target.checked })} />
@@ -969,6 +794,9 @@ const AdminPage = () => {
                                                 <span style={{ fontSize: '0.7rem', padding: '2px 8px', background: v.is_stable ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: v.is_stable ? '#22c55e' : '#ef4444', borderRadius: '4px', textTransform: 'uppercase' }}>
                                                     {v.is_stable ? 'ESTÁVEL' : 'BETA'}
                                                 </span>
+                                                {v.file_path && (
+                                                    <span style={{ fontSize: '0.6rem', padding: '2px 8px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderRadius: '4px', fontWeight: '900' }}>CLOUD READY ☁️</span>
+                                                )}
                                             </div>
                                             <p style={{ margin: '5px 0 0', fontSize: '0.8rem', fontWeight: '700' }}>{v.product_name}</p>
                                             <p style={{ margin: '5px 0 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{v.changelog || 'Nenhum detalhe informado.'}</p>
@@ -1303,6 +1131,34 @@ const AdminPage = () => {
                                 <button onClick={handlePullMembers} style={{ width: '100%', height: '55px', borderRadius: '18px', fontWeight: '950', background: '#8b5cf6', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                                     <span>PUXAR USUÁRIOS PRO DISCORD</span>
                                 </button>
+                            </div>
+
+                            {/* LAUNCHER MASTER CONTROL */}
+                            <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px', border: '1px solid rgba(59, 130, 246, 0.2)', background: 'linear-gradient(135deg, rgba(59,130,246,0.05) 0%, transparent 100%)' }}>
+                                <h3 style={{ marginBottom: '0.5rem', fontWeight: '950', color: '#3b82f6' }}>AUTOMAÇÃO DO LAUNCHER</h3>
+                                <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginBottom: '1.8rem' }}>Gerencie a versão mestre do launcher para auto-update obrigatório.</p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="v1.0.0"
+                                            defaultValue={Object.fromEntries(allSettings.map(s => [s.key, s.value])).launcher_main_version}
+                                            onBlur={(e) => axios.post(`${API_URL}/api/admin/settings`, { key: 'launcher_main_version', value: e.target.value }, { withCredentials: true }).then(() => notify('VERSÃO ATUALIZADA'))}
+                                            style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', color: '#fff', fontSize: '0.8rem' }}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Link Direto"
+                                            defaultValue={Object.fromEntries(allSettings.map(s => [s.key, s.value])).launcher_main_url}
+                                            onBlur={(e) => axios.post(`${API_URL}/api/admin/settings`, { key: 'launcher_main_url', value: e.target.value }, { withCredentials: true }).then(() => notify('URL ATUALIZADA'))}
+                                            style={{ flex: 3, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', color: '#fff', fontSize: '0.8rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ padding: '15px', background: 'rgba(59,130,246,0.1)', borderRadius: '15px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                        <p style={{ margin: 0, fontSize: '0.65rem', color: '#3b82f6', fontWeight: '800' }}>ℹ️ AO MUDAR A VERSÃO, O LAUNCHER ANTIGO IRÁ FECHAR E PEDIRÁ ATUALIZAÇÃO.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>

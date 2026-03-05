@@ -3,6 +3,8 @@ import { LangContext } from '../App'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
+import { useNotification } from '../context/NotificationContext'
+import { useModal } from '../context/ModalContext'
 import { Navigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
@@ -10,6 +12,8 @@ import API_URL from '../api'
 const DashboardPage = () => {
     const { t } = useContext(LangContext)
     const { user, userProducts, isAdmin, role, loading, checkAuth } = useAuth()
+    const { notify } = useNotification()
+    const { askConfirm } = useModal()
     const [resetting, setResetting] = useState(null)
     const [showKeys, setShowKeys] = useState({})
     const [currentTime, setCurrentTime] = useState(new Date())
@@ -61,15 +65,16 @@ const DashboardPage = () => {
     }
 
     const handleResetHWID = async (productId) => {
-        if (!confirm('Deseja realmente resetar seu Hardware ID?')) return
-        try {
-            setResetting(productId)
-            const res = await axios.post(`${API_URL}/api/auth/hwid/reset`, { product_id: productId }, { withCredentials: true })
-            alert(res.data.message || 'HWID resetado com sucesso.')
-            await checkAuth()
-        } catch (err) {
-            alert(err.response?.data?.error || 'Erro ao resetar HWID.')
-        } finally { setResetting(null) }
+        askConfirm('RESETAR HWID?', 'Isso permitirá que você use o software em um novo computador. Você só pode fazer isso uma vez a cada 24 horas.', 'RESETAR AGORA', async () => {
+            try {
+                setResetting(productId)
+                const res = await axios.post(`${API_URL}/api/auth/reset-hwid`, { product_id: productId }, { withCredentials: true })
+                notify(res.data.message || 'HWID resetado com sucesso.')
+                await checkAuth()
+            } catch (err) {
+                notify(err.response?.data?.error || 'Erro ao resetar HWID.', 'error')
+            } finally { setResetting(null) }
+        })
     }
 
     const handleToggleStatus = async (licenseId) => {
@@ -83,7 +88,8 @@ const DashboardPage = () => {
     if (!user) return <Navigate to="/" />
 
     const isCEO = user.discord_id === '1249488594414997676'
-    const userRole = role || (isCEO ? 'OWNER' : isAdmin ? 'STAFF' : 'MEMBER')
+    const userRole = (role || (isAdmin ? 'STAFF' : 'MEMBER')).toUpperCase()
+    const finalRole = isCEO ? 'OWNER' : userRole
 
     return (
         <div style={{ minHeight: '100vh', background: '#050505', color: '#fff' }}>
@@ -110,13 +116,13 @@ const DashboardPage = () => {
                             <span style={{
                                 fontSize: '0.65rem',
                                 fontWeight: '800',
-                                color: isCEO ? '#ff4b2b' : '#3366ff',
+                                color: finalRole === 'OWNER' ? '#ff4b2b' : (finalRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
                                 background: 'rgba(255,255,255,0.03)',
                                 padding: '4px 10px',
                                 borderRadius: '4px',
                                 letterSpacing: '0.1em'
                             }}>
-                                {userRole.toUpperCase()}
+                                {finalRole}
                             </span>
                         </div>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>Welcome back to your workspace</p>
@@ -154,7 +160,7 @@ const DashboardPage = () => {
                             </button>
                         ))}
 
-                        {(user.role === 'reseller' || isAdmin || isCEO) && (
+                        {(role?.toLowerCase() === 'reseller' || isAdmin || isCEO) && (
                             <Link to="/reseller" style={{
                                 marginTop: '10px',
                                 textAlign: 'left',
@@ -230,13 +236,13 @@ const DashboardPage = () => {
                                                 <span style={{
                                                     fontSize: '0.7rem',
                                                     fontWeight: '950',
-                                                    color: userRole === 'OWNER' ? '#ff4b2b' : (userRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
+                                                    color: finalRole === 'OWNER' ? '#ff4b2b' : (finalRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
                                                     background: 'rgba(255,255,255,0.03)',
                                                     padding: '5px 12px',
                                                     borderRadius: '8px',
                                                     letterSpacing: '0.5px'
                                                 }}>
-                                                    {userRole.toUpperCase()}
+                                                    {finalRole}
                                                 </span>
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -306,7 +312,7 @@ const DashboardPage = () => {
                                             </div>
                                             {p.changelog && (
                                                 <button
-                                                    onClick={() => alert(`NOTAS DA VERSÃO v${p.current_version}:\n\n${p.changelog}`)}
+                                                    onClick={() => notify(`NOTAS DA VERSÃO v${p.current_version}:\n\n${p.changelog}`, 'info')}
                                                     style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                                                 >
                                                     O QUE HÁ DE NOVO?

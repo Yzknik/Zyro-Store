@@ -15,7 +15,7 @@ router.get('/', (req: Request, res: Response) => {
 
 router.get('/:id/plans', (req: Request, res: Response) => {
     try {
-        const plans = Product.getPlans(req.params.id);
+        const plans = Product.getPlans(req.params.id as string);
         res.json(plans);
     } catch (err: any) {
         res.status(500).json({ error: err.message });

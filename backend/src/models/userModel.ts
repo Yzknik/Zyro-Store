@@ -5,6 +5,8 @@ export interface UserData {
     discord_id: string;
     username: string;
     avatar: string;
+    role?: string;
+    reseller_balance?: number;
 }
 
 class User {

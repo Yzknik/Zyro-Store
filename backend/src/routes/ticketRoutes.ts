@@ -11,6 +11,7 @@ router.post('/:id/reply', verifyToken, ticketController.replyTicket);
 router.post('/:id/close', verifyToken, ticketController.closeTicket);
 
 // Admin only (managed inside controller check)
-router.get('/admin/list', verifyToken, ticketController.listAllTickets);
+const { verifyAdmin } = await import('../middleware/authMiddleware.js');
+router.get('/admin/list', verifyToken, verifyAdmin, ticketController.listAllTickets);
 
 export default router;

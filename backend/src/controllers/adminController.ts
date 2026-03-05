@@ -6,6 +6,8 @@ import Settings from '../models/settingsModel.js';
 import db from '../config/db.js';
 import { generateLicenseKey } from '../utils/keyGen.js';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { logSystemEvent } from './authController.js';
 
 const getId = (id: any): string => (Array.isArray(id) ? id[0] : id) as string;
@@ -249,7 +251,7 @@ export const updateSetting = (req: Request, res: Response) => {
 
 const getDiscordMemberCount = async () => {
     try {
-        const guildId = '1435379479739371603';
+        const guildId = process.env.GUILD_ID || '1435379479739371603';
         const token = process.env.BOT_API_KEY;
         if (!token) return 0;
         const res = await axios.get(`https://discord.com/api/v10/guilds/${guildId}?with_counts=true`, {
@@ -336,27 +338,48 @@ export const listVersions = (req: Request, res: Response) => {
             ORDER BY lv.created_at DESC
         `).all();
         res.json(versions);
-    } catch (err: any) { res.status(500).json({ error: err.message }); }
+    } catch (err: any) { res.status(500).json({ error: 'SERVICE_UNAVAILABLE' }); }
 };
 
 export const createVersion = (req: Request, res: Response) => {
     try {
-        const { product_id, version, download_url, changelog, is_stable } = req.body;
+        const { product_id: prodId, version, download_url, changelog, is_stable } = req.body;
+        const filePath = req.file ? req.file.path : null;
+
+        // Validation
+        if (!prodId || !version) return res.status(400).json({ error: 'Faltando campos obrigatórios: ID do produto e versão.' });
+
+        const product_id = getId(prodId);
+
         const id = db.prepare(`
-            INSERT INTO launcher_versions (product_id, version, download_url, changelog, is_stable) 
-            VALUES (?, ?, ?, ?, ?)
-        `).run(product_id, version, download_url, changelog, is_stable ? 1 : 0).lastInsertRowid;
+            INSERT INTO launcher_versions (product_id, version, download_url, file_path, changelog, is_stable) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(product_id, version, download_url || '', filePath, changelog || '', parseInt(is_stable) || 0).lastInsertRowid;
 
         const reqUser = (req as any).user;
-        if (reqUser) logSystemEvent(reqUser.id, 'VERSÃO LANÇADA', `Lançou a versão ${version} para o produto ID: ${product_id}`);
+        if (reqUser) logSystemEvent(reqUser.id, 'VERSÃO LANÇADA', `Lançou a versão ${version} para o produto ID: ${product_id} ${filePath ? '(Binário Uploaded)' : ''}`);
 
-        res.status(201).json({ id, product_id, version, download_url, changelog, is_stable });
-    } catch (err: any) { res.status(500).json({ error: err.message }); }
+        // Update product current_version if stable (strict check)
+        if (parseInt(is_stable) === 1) {
+            db.prepare('UPDATE products SET current_version = ? WHERE id = ?').run(version, product_id);
+        }
+
+        res.status(201).json({ id, product_id, version, download_url, changelog, is_stable, file_path: filePath });
+    } catch (err: any) {
+        res.status(500).json({ error: 'INTERNAL_ERROR', details: err.message });
+    }
 };
 
 export const deleteVersion = (req: Request, res: Response) => {
     try {
-        db.prepare('DELETE FROM launcher_versions WHERE id = ?').run(getId(req.params.id));
+        const id = getId(req.params.id);
+        const version: any = db.prepare('SELECT file_path FROM launcher_versions WHERE id = ?').get(id);
+
+        if (version?.file_path) {
+            try { if (fs.existsSync(version.file_path)) fs.unlinkSync(version.file_path); } catch (e) { }
+        }
+
+        db.prepare('DELETE FROM launcher_versions WHERE id = ?').run(id);
         res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
@@ -382,7 +405,10 @@ export const updateUserRole = (req: Request, res: Response) => {
 export const addResellerBalance = (req: Request, res: Response) => {
     try {
         const { amount } = req.body;
-        db.prepare('UPDATE users SET reseller_balance = reseller_balance + ? WHERE id = ?').run(amount, getId(req.params.id));
+        const val = parseFloat(amount);
+        if (isNaN(val) || val < 0) return res.status(400).json({ error: 'VALOR INVÁLIDO' });
+
+        db.prepare('UPDATE users SET reseller_balance = reseller_balance + ? WHERE id = ?').run(val, getId(req.params.id));
         const reqUser = (req as any).user;
         if (reqUser) logSystemEvent(reqUser.id, 'RECARGA SALDO', `Adicionou R$ ${amount} de saldo ao revendedor ID ${req.params.id}`);
         res.json({ success: true });

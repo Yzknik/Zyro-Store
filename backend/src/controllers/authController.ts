@@ -11,8 +11,8 @@ dotenv.config();
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
-const GUILD_ID = '1435379479739371603'; // Servidor Zyro
-const CEO_ID = '1249488594414997676';
+const GUILD_ID = process.env.GUILD_ID || '1435379479739371603';
+const CEO_ID = process.env.CEO_ID || '1249488594414997676';
 
 // Role genérica de membro/cliente para dar 'tag'
 const VERIFIED_ROLE_ID = process.env.DISCORD_VERIFIED_ROLE_ID; // Você pode configurar no .env depois
@@ -182,16 +182,17 @@ export const discordCallback = async (req: Request, res: Response) => {
         }
 
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role: highestRole }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
 
-        return res.redirect(user.password ? 'http://localhost:3000/dashboard' : 'http://localhost:3000/verified');
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(user.password ? `${frontendUrl}/dashboard` : `${frontendUrl}/verified`);
     } catch (err: any) {
         console.error("Auth Callback Error:", err);
         return res.status(500).send(`
             <div style="background:#0f172a;color:#fff;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;">
                 <h1 style="color:#ef4444">Erro na Autenticação</h1>
                 <p>${err.message}</p>
-                <a href="http://localhost:3000" style="color:#3b82f6;text-decoration:none;margin-top:20px;">Voltar para o site</a>
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}" style="color:#3b82f6;text-decoration:none;margin-top:20px;">Voltar para o site</a>
             </div>
         `);
     }
@@ -214,7 +215,7 @@ export const login = async (req: Request, res: Response) => {
         const role = user.discord_id === CEO_ID ? 'OWNER' : (user.role ? user.role.toUpperCase() : (isAdmin ? 'ADMIN' : 'USER'));
 
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
         res.json({ success: true, isAdmin });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -251,10 +252,11 @@ export const resetHWID = async (req: any, res: Response) => {
             return res.status(403).json({ error: `Você já resetou recentemente. Aguarde mais ${remaining} dias.` });
         }
 
+        // Clear HWID and update last reset time
         db.prepare('UPDATE user_products SET hwid = NULL, hwid_reset_at = DATETIME("now") WHERE id = ?').run(license.id);
 
-        logSystemEvent(user.id, 'RESET DE HWID (PAINEL)', `Reset de máquina efetuado no ID do Produto: ${product_id}`);
-        res.json({ success: true, message: 'HWID resetado com sucesso.' });
+        logSystemEvent(user.id, 'RESET DE HWID (PAINEL)', `Reset de máquina efetuado no ID do Produto: ${product_id} para o usuário ${user.username}`);
+        res.json({ success: true, message: 'HWID resetado com sucesso. Entre pelo launcher na sua nova máquina.' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

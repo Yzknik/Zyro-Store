@@ -39,7 +39,7 @@ export const activatePlan = async (req: Request, res: Response) => {
 export const getUserInfo = async (req: Request, res: Response) => {
     try {
         const { discord_id } = req.params;
-        const user = User.findByDiscordId(discord_id);
+        const user = User.findByDiscordId(discord_id as string);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         const products = db.prepare(`

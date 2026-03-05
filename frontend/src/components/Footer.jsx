@@ -34,7 +34,7 @@ const Footer = () => {
             </h4>
             <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <li><Link to="/products" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: '0.85rem', transition: '0.2s' }}>All Softwares</Link></li>
-              <li><a href="https://discord.gg/zyrostore" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: '0.85rem' }}>Discord Community</a></li>
+              <li><a href="https://discord.gg/zyrogg" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: '0.85rem' }}>Discord Community</a></li>
             </ul>
           </div>
 

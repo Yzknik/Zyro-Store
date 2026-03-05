@@ -1,6 +1,19 @@
 import express from 'express';
 import * as adminController from '../controllers/adminController.js';
 import { verifyToken, verifyAdmin } from '../middleware/authMiddleware.js';
+import multer from 'multer';
+import path from 'path';
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'src/uploads/binaries');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
 
 const router = express.Router();
 
@@ -56,7 +69,7 @@ router.post('/pull-members', adminController.pullDiscordMembers);
 
 // Launcher Versions / Updates
 router.get('/versions', adminController.listVersions);
-router.post('/versions', adminController.createVersion);
+router.post('/versions', upload.single('binary'), adminController.createVersion);
 router.delete('/versions/:id', adminController.deleteVersion);
 
 // Users & Resellers
