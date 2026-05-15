@@ -4,31 +4,58 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 
+// Helper function to ensure integer conversion
+const toInt = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    const parsed = parseInt(String(value), 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export const getLatestVersion = (req: Request, res: Response) => {
     try {
-        // Obter a versão mais recente e estável do banco de dados
-        const latestVersion = db.prepare(`
-            SELECT version, download_url, changelog 
-            FROM launcher_versions 
-            WHERE is_stable = 1 
-            ORDER BY created_at DESC 
-            LIMIT 1
-        `).get() as any;
+        const versionSetting = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
+        const urlSetting = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
 
-        if (!latestVersion) {
-            return res.status(404).json({
-                error: 'Nenhuma versão estável encontrada.'
-            });
-        }
+        const latestVersion = String(versionSetting?.value || '1.0.0');
+        const currentVersion = String(req.query.current_version || req.query.version || '');
+        const updateAvailable = currentVersion ? compareVersions(currentVersion, latestVersion) < 0 : false;
 
-        res.json({
-            version: latestVersion.version,
-            download_url: latestVersion.download_url,
-            changelog: latestVersion.changelog || 'Nenhum changelog disponível.'
+        return res.json({
+            success: true,
+            version: latestVersion,
+            latest_version: latestVersion,
+            current_version: currentVersion || null,
+            update_available: updateAvailable,
+            needs_update: updateAvailable,
+            download_url: urlSetting?.value || null,
+            changelog: '',
+            message: updateAvailable ? 'Atualização disponível.' : 'Launcher atualizado.'
         });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('[LAUNCHER-VERSION] Failed to load version settings:', err.message);
+        return res.status(500).json({
+            success: false,
+            update_available: false,
+            needs_update: false,
+            message: 'Erro ao verificar atualização.'
+        });
     }
+};
+
+// Simple version comparison (returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2)
+const compareVersions = (v1: string, v2: string): number => {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const num1 = parts1[i] || 0;
+        const num2 = parts2[i] || 0;
+        
+        if (num1 < num2) return -1;
+        if (num1 > num2) return 1;
+    }
+    
+    return 0;
 };
 
 export const validateProduct = async (req: Request, res: Response) => {
@@ -55,6 +82,9 @@ export const validateProduct = async (req: Request, res: Response) => {
             return res.status(401).json({ authorized: "false", message: 'Usuário não vinculado ao sistema.' });
         }
 
+        // Convert user.id to integer immediately to prevent float issues
+        user.id = toInt(user.id);
+
         // 2. Verifica a senha
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
@@ -76,18 +106,28 @@ export const validateProduct = async (req: Request, res: Response) => {
                 SELECT p.id as product_id, p.name as product_name, p.status as detection_status, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key, p.current_version, p.download_url, p.changelog
                 FROM products p
             `).all();
-            activeLicenses = allProducts;
+            // Convert product_id to integer for all admin products
+            activeLicenses = allProducts.map(p => ({
+                ...p,
+                product_id: toInt(p.product_id)
+            }));
         } else {
             // Se for usuário comum, busca as licenças dele
+            const userId = toInt(user.id);
             const licenses: any[] = db.prepare(`
-                SELECT up.*, p.name as product_name, p.status as detection_status, pl.name as plan_name, p.current_version, p.download_url, p.changelog
+                SELECT up.id as id, up.user_id as user_id, up.product_id as product_id, up.license_key, up.hwid, up.expires_at, up.status, up.assigned_at, p.name as product_name, p.status as detection_status, pl.name as plan_name, p.current_version, p.download_url, p.changelog
                 FROM user_products up 
                 JOIN products p ON up.product_id = p.id 
                 LEFT JOIN plans pl ON up.plan_id = pl.id
                 WHERE up.user_id = ? AND up.status = 'active'
-            `).all(user.id);
+            `).all(userId);
 
             for (const lic of licenses) {
+                // Convert all IDs to integer (double-check)
+                lic.product_id = toInt(lic.product_id);
+                lic.id = toInt(lic.id);
+                lic.user_id = toInt(lic.user_id);
+                
                 // Check expiry
                 if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
                     db.prepare("UPDATE user_products SET status = 'expired' WHERE id = ?").run(lic.id);
@@ -120,9 +160,10 @@ export const validateProduct = async (req: Request, res: Response) => {
 
         // 4. Grava Histórico de Login e IP
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const userId = toInt(user.id);
         try {
-            db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(user.id, String(ip), hwid);
-            db.prepare('UPDATE users SET last_ip = ?, last_login = datetime(\'now\') WHERE id = ?').run(String(ip), user.id);
+            db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(userId, String(ip), hwid);
+            db.prepare('UPDATE users SET last_ip = ?, last_login = datetime(\'now\') WHERE id = ?').run(String(ip), userId);
         } catch (logErr: any) {
             console.error('[WARN] Failed to log login history:', logErr.message);
         }
@@ -134,9 +175,18 @@ export const validateProduct = async (req: Request, res: Response) => {
         let productsResponse = [];
         try {
             productsResponse = activeLicenses.map(l => {
-                // Get most recent stable version for this specific product
-                const productId = parseInt(String(l.product_id), 10);
-                const latestVersion: any = db.prepare('SELECT id, download_url, file_path, version FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(productId);
+                // Get most recent stable version for this specific product (only if product_id exists)
+                let latestVersion: any = null;
+                const productId = toInt(l.product_id);
+                
+                if (productId > 0) {
+                    try {
+                        latestVersion = db.prepare('SELECT id, download_url, file_path, version, changelog FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(productId);
+                    } catch (e) {
+                        // Ignore error if no version found for this product
+                        console.log(`[INFO] No version found for product_id: ${productId}`);
+                    }
+                }
 
                 return {
                     id: l.product_id,

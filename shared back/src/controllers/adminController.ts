@@ -424,3 +424,34 @@ export const setResellerBalance = (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
+
+// --- Launcher Version Management ---
+export const updateLauncherVersion = (req: Request, res: Response) => {
+    try {
+        const { version, download_url } = req.body;
+        
+        if (!version) return res.status(400).json({ error: 'Versão é obrigatória.' });
+        if (!download_url) return res.status(400).json({ error: 'URL de download é obrigatória.' });
+
+        // Update launcher settings
+        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(version, 'launcher_main_version');
+        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(download_url, 'launcher_main_url');
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'ATUALIZAÇÃO LAUNCHER', `Atualizou launcher para versão ${version} - URL: ${download_url}`);
+
+        res.json({ success: true, version, download_url });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const getLauncherVersion = (req: Request, res: Response) => {
+    try {
+        const version = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
+        const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
+        
+        res.json({
+            version: version?.value || '1.0.0',
+            download_url: url?.value || ''
+        });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};

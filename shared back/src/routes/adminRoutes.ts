@@ -72,6 +72,10 @@ router.get('/versions', adminController.listVersions);
 router.post('/versions', upload.single('binary'), adminController.createVersion);
 router.delete('/versions/:id', adminController.deleteVersion);
 
+// Launcher Main Version Management
+router.get('/launcher-version', adminController.getLauncherVersion);
+router.post('/launcher-version', adminController.updateLauncherVersion);
+
 // Users & Resellers
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id/role', adminController.updateUserRole);

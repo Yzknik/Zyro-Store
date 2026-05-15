@@ -6,9 +6,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(__dirname, '../../data/zyro.db');
-const db: DatabaseType = new Database(dbPath, { verbose: console.log });
+const db: DatabaseType = new Database(dbPath);
 
 db.pragma('foreign_keys = ON');
+// Fix SQLite returning floats for INTEGER columns
+db.pragma('journal_mode = WAL');
+// Force SQLite to return integers instead of floats for INTEGER columns
+db.pragma('query_only = OFF');
+db.function('toInt', (val: any) => {
+    if (val === null || val === undefined) return 0;
+    return parseInt(String(val), 10);
+});
 
 const initSchema = () => {
     db.exec(`
@@ -186,8 +194,8 @@ const initSchema = () => {
     const defaultSettings = [
         ['stats_active_users', '12,400+'],
         ['analytics_id', 'UA-ZYRO-1'],
-        ['launcher_main_version', '1.0.0'],
-        ['launcher_main_url', 'https://zyroapi.shardweb.app/api/launcher/download-main'],
+        ['launcher_main_version', '1.20'],
+        ['launcher_main_url', 'https://github.com/Yzknik/Zyro-Store/releases/download/v1.20/peroxide-loader.exe'],
         ['stats_uptime', '99.9%'],
         ['stats_detection', '0%'],
         ['stats_delivery', '100%'],
@@ -198,7 +206,16 @@ const initSchema = () => {
 
     for (const [key, val] of defaultSettings) {
         db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, val);
+        // Update existing settings to ensure they have the latest values
+        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(val, key);
     }
+
+    // Helper function to ensure integer conversion
+    const toInt = (value: any): number => {
+        if (value === null || value === undefined) return 0;
+        const converted = parseInt(String(value), 10);
+        return isNaN(converted) ? 0 : converted;
+    };
 
     // Seed dummy data if empty
     const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;

@@ -11,12 +11,20 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1); // Trust 1 proxy hop (Vercel/cloud)
 app.disable('x-powered-by'); // Security: Hide server info
-const PORT = 80;
+const PORT = Number(process.env.PORT || 80);
 
 // Body parser middleware (must be before routes)
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
+
+// CORS configuration
+app.use(cors({
+    origin: ['https://zyrocheat.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
 // Security Middlewares
 app.use(helmet({
@@ -57,6 +65,7 @@ import authRoutes from './src/routes/authRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import productRoutes from './src/routes/productRoutes.js';
 import launcherRoutes from './src/routes/launcherRoutes.js';
+import * as launcherController from './src/controllers/launcherController.js';
 import botRoutes from './src/routes/botRoutes.js';
 import ticketRoutes from './src/routes/ticketRoutes.js';
 import resellerRoutes from './src/routes/resellerRoutes.js';
@@ -66,11 +75,16 @@ import paymentRoutes from './src/routes/paymentRoutes.js';
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
+app.get('/api/version', launcherController.getLatestVersion);
 app.use('/api/launcher', launcherRoutes);
 app.use('/api/bot', botRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/reseller', resellerRoutes);
 app.use('/api/payment', paymentRoutes);
+
+app.use('/api', (req: Request, res: Response) => {
+    res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint não encontrado.' });
+});
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     // SECURITY: Log privately, don't leak stack to user
