@@ -112,7 +112,7 @@ function App() {
               <ScrollReveal />
               <CustomCursor />
               <MouseSpotlight />
-              <div style={{ background: '#080c14', minHeight: '100vh', position: 'relative' }}>
+              <div style={{ background: '#0a0a0a', minHeight: '100vh', position: 'relative' }}>
                 <Routes>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/login" element={<LoginPage />} />

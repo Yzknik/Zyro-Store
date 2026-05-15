@@ -56,11 +56,14 @@ CREATE TABLE IF NOT EXISTS user_products (
 -- Launcher Versions
 CREATE TABLE IF NOT EXISTS launcher_versions (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INTEGER,
     version VARCHAR(20) NOT NULL,
-    download_url TEXT NOT NULL,
+    download_url TEXT,
+    file_path TEXT,
     changelog TEXT,
     is_stable BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
 -- API Keys (For Bot and Launcher)

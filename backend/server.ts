@@ -34,12 +34,19 @@ const globalLimiter = rateLimit({
 
 const strictLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 30, // Stricter for production
+    max: 200, // Increased for admin dashboard with multiple data fetches
     message: { error: 'Limites de segurança atingidos. Tente novamente mais tarde.' }
 });
 
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30, // Keep stricter limit on auth endpoints
+    message: { error: 'Muitas tentativas de login. Tente novamente mais tarde.' }
+});
+
 app.use('/api/', globalLimiter);
-app.use(['/api/auth/login', '/api/admin', '/api/launcher/payload', '/api/launcher/validate', '/api/payment/create', '/api/payment/manual-confirm'], strictLimiter);
+app.use('/api/auth/login', loginLimiter);
+app.use(['/api/admin', '/api/launcher/payload', '/api/launcher/validate', '/api/payment/create', '/api/payment/manual-confirm'], strictLimiter);
 
 // Default Route
 app.get('/', (req: Request, res: Response) => {

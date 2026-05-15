@@ -356,7 +356,7 @@ const ProductsPage = () => {
                 <div className="container-lg">
                     <div style={{ textAlign: 'center', marginBottom: '80px' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: '900', color: '#3366ff', letterSpacing: '0.4em', marginBottom: '20px', display: 'block' }}>CATALOGUE</span>
-                        <h1 className="title-ultra" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)' }}>Elite Software</h1>
+                        <h1 className="title-ultra" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)' }}>Cheats Zyro</h1>
                     </div>
 
                     {/* Filter Bar */}

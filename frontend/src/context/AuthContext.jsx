@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }) => {
             await axios.get(`${API_URL}/api/auth/logout`, { withCredentials: true });
             setUser(null);
             setIsAdmin(false);
+            setRole('USER');
             setUserProducts([]);
         } catch (err) {
             console.error('Logout failed');

@@ -234,6 +234,7 @@ const initSchema = () => {
     try { db.prepare('ALTER TABLE products ADD COLUMN download_url TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN changelog TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN product_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN file_path TEXT').run(); } catch (e) { }
 
     console.log('✅ SQLite Database Initialized with System Logs');
 };

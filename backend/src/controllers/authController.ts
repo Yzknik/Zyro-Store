@@ -253,7 +253,7 @@ export const resetHWID = async (req: any, res: Response) => {
         }
 
         // Clear HWID and update last reset time
-        db.prepare('UPDATE user_products SET hwid = NULL, hwid_reset_at = DATETIME("now") WHERE id = ?').run(license.id);
+        db.prepare('UPDATE user_products SET hwid = NULL, hwid_reset_at = datetime(\'now\') WHERE id = ?').run(license.id);
 
         logSystemEvent(user.id, 'RESET DE HWID (PAINEL)', `Reset de máquina efetuado no ID do Produto: ${product_id} para o usuário ${user.username}`);
         res.json({ success: true, message: 'HWID resetado com sucesso. Entre pelo launcher na sua nova máquina.' });
@@ -326,7 +326,8 @@ export const getMe = async (req: any, res: Response) => {
 
         const isAdmin = User.isAdmin(req.user.discord_id);
         const isCEO = req.user.discord_id === CEO_ID;
-        const role = isCEO ? 'OWNER' : (user.role ? user.role.toUpperCase() : (isAdmin ? 'ADMIN' : 'USER'));
+        // Use role from JWT token which was correctly calculated during login
+        const role = req.user.role || (isCEO ? 'OWNER' : (isAdmin ? 'ADMIN' : 'USER'));
 
         let products;
         if (isCEO) {

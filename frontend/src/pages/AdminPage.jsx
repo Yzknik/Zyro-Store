@@ -244,7 +244,7 @@ const RoleModal = ({ isOpen, username, avatar, currentRole, onConfirm, onCancel 
 };
 
 const AdminPage = () => {
-    const { user, isAdmin, loading: authLoading } = useAuth()
+    const { user, isAdmin, role, loading: authLoading } = useAuth()
     const { notify } = useNotification()
     const { askConfirm, askInput } = useModal()
     const CEO_ID = '1249488594414997676'
@@ -266,7 +266,7 @@ const AdminPage = () => {
     const [newLicense, setNewLicense] = useState({ discord_id: '', product_id: '', plan_id: '', duration_days: 0 })
     const [newModId, setNewModId] = useState('')
     const [newsList, setNewsList] = useState([])
-    const [allSettings, setAllSettings] = useState({})
+    const [allSettings, setAllSettings] = useState([])
     const [newNews, setNewNews] = useState({ title: '', description: '' })
     const [localSettings, setLocalSettings] = useState({})
 
@@ -285,34 +285,34 @@ const AdminPage = () => {
     }, [allSettings])
 
     const fetchStats = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/stats`, { withCredentials: true }); setStats(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/stats`, { withCredentials: true }); setStats(res.data || { users: 0, discordMembers: 0, products: 0, totalSales: 0, activeLicenses: 0, monthlySales: 0, chartData: [] }) } catch (e) { console.error('Error fetching stats:', e); }
     }
     const fetchProducts = async () => {
-        try { const res = await axios.get(`${API_URL}/api/products`, { withCredentials: true }); setProducts(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/products`, { withCredentials: true }); setProducts(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching products:', e); setProducts([]); }
     }
     const fetchCategories = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/categories`, { withCredentials: true }); setCategories(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/categories`, { withCredentials: true }); setCategories(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching categories:', e); setCategories([]); }
     }
     const fetchLicenses = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/licenses`, { withCredentials: true }); setLicenses(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/licenses`, { withCredentials: true }); setLicenses(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching licenses:', e); setLicenses([]); }
     }
     const fetchModerators = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/moderators`, { withCredentials: true }); setModerators(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/moderators`, { withCredentials: true }); setModerators(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching moderators:', e); setModerators([]); }
     }
     const fetchNews = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/news`, { withCredentials: true }); setNewsList(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/news`, { withCredentials: true }); setNewsList(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching news:', e); setNewsList([]); }
     }
     const fetchSettings = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/settings`, { withCredentials: true }); setAllSettings(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/settings`, { withCredentials: true }); setAllSettings(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching settings:', e); setAllSettings([]); }
     }
     const fetchLogs = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/logs`, { withCredentials: true }); setLogs(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/logs`, { withCredentials: true }); setLogs(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching logs:', e); setLogs([]); }
     }
     const fetchVersions = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/versions`, { withCredentials: true }); setVersionList(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/versions`, { withCredentials: true }); setVersionList(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching versions:', e); setVersionList([]); }
     }
     const fetchUsers = async () => {
-        try { const res = await axios.get(`${API_URL}/api/admin/users`, { withCredentials: true }); setUsers(res.data) } catch (e) { }
+        try { const res = await axios.get(`${API_URL}/api/admin/users`, { withCredentials: true }); setUsers(Array.isArray(res.data) ? res.data : []) } catch (e) { console.error('Error fetching users:', e); setUsers([]); }
     }
 
 

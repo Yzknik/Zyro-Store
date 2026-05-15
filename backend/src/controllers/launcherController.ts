@@ -26,24 +26,26 @@ export const validateProduct = async (req: Request, res: Response) => {
         // 0. Verifica Integridade do Launcher (Opcional se enviado no login)
         const serverHash = db.prepare("SELECT value FROM settings WHERE key = 'launcher_integrity_hash'").get() as any;
         if (integrity_hash && integrity_hash !== serverHash?.value) {
-            return res.status(403).json({ authorized: false, message: 'Launcher modificado detectado. Rebaixe no site.' });
+            return res.status(403).json({ authorized: "false", message: 'Launcher modificado detectado. Rebaixe no site.' });
         }
 
         if (!username || !password) {
-            return res.status(400).json({ authorized: false, message: 'Identificadores ausentes.' });
+            return res.status(400).json({ authorized: "false", message: 'Identificadores ausentes.' });
         }
 
         // 1. Busca o usuário
         const user: any = db.prepare('SELECT id, discord_id, username, password, avatar FROM users WHERE username = ?').get(username);
 
         if (!user || !user.password) {
-            return res.status(401).json({ authorized: false, message: 'Usuário não vinculado ao sistema.' });
+            return res.status(401).json({ authorized: "false", message: 'Usuário não vinculado ao sistema.' });
         }
 
         // 2. Verifica a senha
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ authorized: false, message: 'Senha incorreta.' });
+            // SECURITY: Log failed login attempt
+            console.warn(`[SECURITY] Failed login attempt for user '${username}' from IP ${req.headers['x-forwarded-for'] || req.socket.remoteAddress} - Wrong password`);
+            return res.status(401).json({ authorized: "false", message: 'Senha incorreta.' });
         }
 
         // 3. Verifica se o usuário é Admin/Owner
@@ -89,7 +91,7 @@ export const validateProduct = async (req: Request, res: Response) => {
                 } else if (storedHwid !== receivedHwid) {
                     console.warn(`[HWID-MISMATCH] User ${user.username} tried ${lic.product_name} from ${receivedHwid} (Expected: ${storedHwid})`);
                     return res.status(403).json({
-                        authorized: false,
+                        authorized: "false",
                         message: `Acesso negado: Este produto está bloqueado para outra máquina (${lic.product_name}). Reset o HWID no site.`
                     });
                 }
@@ -98,32 +100,25 @@ export const validateProduct = async (req: Request, res: Response) => {
         }
 
         if (activeLicenses.length === 0 && !isAdmin) {
-            return res.status(403).json({ authorized: false, message: 'Você não possui licenças ativas.' });
+            return res.status(403).json({ authorized: "false", message: 'Você não possui licenças ativas.' });
         }
 
         // 4. Grava Histórico de Login e IP
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(user.id, String(ip), hwid);
-        db.prepare('UPDATE users SET last_ip = ?, last_login = DATETIME("now") WHERE id = ?').run(String(ip), user.id);
+        try {
+            db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(user.id, String(ip), hwid);
+            db.prepare('UPDATE users SET last_ip = ?, last_login = datetime(\'now\') WHERE id = ?').run(String(ip), user.id);
+        } catch (logErr: any) {
+            console.error('[WARN] Failed to log login history:', logErr.message);
+        }
 
         // 5. Busca Mensagem de Broadcast
         const broadcast = db.prepare("SELECT value FROM settings WHERE key = 'broadcast_message'").get() as any;
 
-        // 6. Success Response
-        const summary = activeLicenses.map(l => `${l.product_name} [${l.plan_name || 'Lifetime'}] - ${l.expires_at || 'Nunca'} ID:${l.license_key}`).join(' | ');
-
-        res.json({
-            authorized: true,
-            message: 'Acesso concedido!',
-            broadcast: broadcast?.value || '',
-            user_info: {
-                username: user.username,
-                discord_id: user.discord_id,
-                avatar: user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png',
-                role: role
-            },
-            games_summary: summary,
-            products: activeLicenses.map(l => {
+        // 6. Build Products Response with proper error handling
+        let productsResponse = [];
+        try {
+            productsResponse = activeLicenses.map(l => {
                 // Get most recent stable version for this specific product
                 const latestVersion: any = db.prepare('SELECT id, download_url, file_path, version FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(l.product_id);
 
@@ -133,15 +128,39 @@ export const validateProduct = async (req: Request, res: Response) => {
                     version: latestVersion?.version || l.current_version || '1.0.0',
                     payload_id: latestVersion?.id || null,
                     download_url: latestVersion?.download_url || l.download_url || '',
-                    has_cloud_bin: !!(latestVersion?.file_path), // Flag for launcher to know it can use downloadPayload endpoint
+                    has_cloud_bin: !!(latestVersion?.file_path),
                     changelog: latestVersion?.changelog || l.changelog || '',
                     plan: l.plan_name || 'Lifetime',
                     expiry: l.expires_at || 'Never',
                     key: l.license_key,
                     status: l.detection_status || 'UNDETECTED'
                 };
-            }),
-            session_token: Math.random().toString(36).substring(2, 15)
+            });
+        } catch (mapErr: any) {
+            console.error('[ERROR] Failed to map products:', mapErr.message);
+            productsResponse = [];
+        }
+
+        // 7. Success Response - Formato compatível com loader C++ (flatten)
+        const summary = activeLicenses.map(l => `${l.product_name} [${l.plan_name || 'Lifetime'}] - ${l.expires_at || 'Nunca'} ID:${l.license_key}`).join(' | ');
+
+        // Gerar session token seguro
+        const crypto = await import('crypto');
+        const secureToken = crypto.randomBytes(32).toString('hex');
+
+        res.json({
+            authorized: true,
+            message: 'Acesso concedido!',
+            broadcast: broadcast?.value || '',
+            // Campos no nível raiz (compatível com loader C++)
+            username: user.username,
+            discord_id: user.discord_id,
+            avatar_url: user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png',
+            role: role,
+            games: summary,
+            // Dados completos em products (para uso futuro)
+            products: productsResponse,
+            session_token: secureToken
         });
 
     } catch (err: any) {
@@ -156,7 +175,7 @@ export const heartbeat = (req: Request, res: Response) => {
         if (!username) return res.status(400).json({ error: 'Username required' });
 
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        db.prepare('UPDATE users SET last_heartbeat = DATETIME("now"), last_ip = ? WHERE username = ?').run(String(ip), username);
+        db.prepare('UPDATE users SET last_heartbeat = datetime(\'now\'), last_ip = ? WHERE username = ?').run(String(ip), username);
 
         res.json({ status: 'alive' });
     } catch (err: any) {
