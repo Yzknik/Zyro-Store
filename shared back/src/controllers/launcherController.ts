@@ -6,13 +6,25 @@ import path from 'path';
 
 export const getLatestVersion = (req: Request, res: Response) => {
     try {
-        const v = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
-        const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
+        // Obter a versão mais recente e estável do banco de dados
+        const latestVersion = db.prepare(`
+            SELECT version, download_url, changelog 
+            FROM launcher_versions 
+            WHERE is_stable = 1 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        `).get() as any;
+
+        if (!latestVersion) {
+            return res.status(404).json({
+                error: 'Nenhuma versão estável encontrada.'
+            });
+        }
 
         res.json({
-            version: v?.value || '1.0.0',
-            download_url: url?.value || '',
-            changelog: 'System auto-update enforced by administrator.'
+            version: latestVersion.version,
+            download_url: latestVersion.download_url,
+            changelog: latestVersion.changelog || 'Nenhum changelog disponível.'
         });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -21,6 +33,9 @@ export const getLatestVersion = (req: Request, res: Response) => {
 
 export const validateProduct = async (req: Request, res: Response) => {
     try {
+        if (!req.body) {
+            return res.status(400).json({ authorized: "false", message: 'Corpo da requisição ausente.' });
+        }
         const { username, password, hwid, product_name, integrity_hash } = req.body;
 
         // 0. Verifica Integridade do Launcher (Opcional se enviado no login)

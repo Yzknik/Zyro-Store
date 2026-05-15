@@ -9,15 +9,22 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-app.set('trust proxy', true); // Trust proxy for rate limiting behind shared cloud
+app.set('trust proxy', 1); // Trust 1 proxy hop (Vercel/cloud)
 app.disable('x-powered-by'); // Security: Hide server info
 const PORT = 80;
+
+// Body parser middleware (must be before routes)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Security Middlewares
 app.use(helmet({
     contentSecurityPolicy: false, // For easier dev, can be tightened
     crossOriginEmbedderPolicy: false
-2// Rate Limiting
+}));
+
+// Rate Limiting
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 1000,
