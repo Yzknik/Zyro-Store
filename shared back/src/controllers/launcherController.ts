@@ -135,7 +135,8 @@ export const validateProduct = async (req: Request, res: Response) => {
         try {
             productsResponse = activeLicenses.map(l => {
                 // Get most recent stable version for this specific product
-                const latestVersion: any = db.prepare('SELECT id, download_url, file_path, version FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(l.product_id);
+                const productId = parseInt(String(l.product_id), 10);
+                const latestVersion: any = db.prepare('SELECT id, download_url, file_path, version FROM launcher_versions WHERE product_id = ? AND is_stable = 1 ORDER BY created_at DESC LIMIT 1').get(productId);
 
                 return {
                     id: l.product_id,
