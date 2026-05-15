@@ -89,3 +89,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 app.listen(PORT, () => {
     console.log(`🚀 Zyro Secure Backend running on port ${PORT}`);
 });
+
+// Vercel handler
+export default app;

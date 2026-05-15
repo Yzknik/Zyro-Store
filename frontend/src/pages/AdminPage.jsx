@@ -486,8 +486,8 @@ const AdminPage = () => {
                 }}
             />
 
-            <div style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', overflowX: 'auto' }}>
+            <div className="admin-container" style={{ paddingTop: '120px', paddingBottom: '100px', width: '90%', margin: '0 auto' }}>
+                <div className="admin-tabs" style={{ display: 'flex', gap: '20px', marginBottom: '3rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', overflowX: 'auto' }}>
                     {[
                         ['dashboard', 'CENTRAL'],
                         ['products', 'STOCKS'],
@@ -538,7 +538,7 @@ const AdminPage = () => {
                                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.15)', fontSize: '0.75rem', marginTop: '6px' }}>Acesse a aba USUÁRIOS e promova alguém para <strong>RESELLER</strong></p>
                                 </div>
                             ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                                <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
                                     {resellers.map(u => (
                                         <div key={u.id} style={{
                                             background: 'rgba(255,255,255,0.02)',
@@ -633,12 +633,12 @@ const AdminPage = () => {
 
                 {activeTab === 'users' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
+                        <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
                             <div style={{ borderLeft: '4px solid #3366ff', paddingLeft: '20px' }}>
                                 <h2 style={{ fontSize: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>GERENCIAMENTO DE USUÁRIOS & REVENDA</h2>
                                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Gerencie permissões, cargos de revendedores e adicione saldo para geração de stock.</p>
                             </div>
-                            <div style={{ position: 'relative' }}>
+                            <div className="admin-search" style={{ position: 'relative' }}>
                                 <input
                                     type="text"
                                     placeholder="Procurar Usuário / ID..."
@@ -659,8 +659,8 @@ const AdminPage = () => {
                             </div>
                         </div>
 
-                        <div className="glass" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <div className="admin-table-container glass" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden' }}>
+                            <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                                 <thead style={{ background: 'rgba(255,255,255,0.02)', fontSize: '0.7rem', fontWeight: '950', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}>
                                     <tr>
                                         <th style={{ padding: '25px' }}>USUÁRIO</th>
@@ -750,7 +750,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'updates' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
                         <div>
                             <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '20px', marginBottom: '30px' }}>
                                 <h2 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '1px' }}>LANÇAR ATUALIZAÇÃO</h2>
@@ -846,7 +846,7 @@ const AdminPage = () => {
 
                 {activeTab === 'dashboard' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.5rem' }}>
+                        <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.5rem' }}>
                             {[
                                 { label: 'TOTAL USERS', val: stats.users, color: '#3b82f6' },
                                 { label: 'DISCORD', val: stats.discordMembers, color: '#5865F2' },
@@ -861,7 +861,7 @@ const AdminPage = () => {
                             ))}
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
+                        <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
                             <div className="glass" style={{ padding: '3rem', borderRadius: '45px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <h3 style={{ fontWeight: '950', fontSize: '1.4rem', letterSpacing: '-0.5px' }}>ANÁLISE DE VENDAS (DB)</h3>
@@ -894,7 +894,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'products' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                                 <h3 style={{ marginBottom: '1.8rem', fontWeight: '950', letterSpacing: '1px' }}>CRIAR PRODUTO</h3>
@@ -914,7 +914,7 @@ const AdminPage = () => {
                                         <option value="TESTING">TESTING</option>
                                         <option value="DETECTED">DETECTED</option>
                                     </select>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                                         <input type="text" placeholder="Versão (ex: 1.0.2)" value={newProduct.current_version} onChange={e => setNewProduct({ ...newProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
                                         <input type="text" placeholder="URL Direta de Download (.exe / .zip)" value={newProduct.download_url} onChange={e => setNewProduct({ ...newProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
                                     </div>
@@ -930,7 +930,7 @@ const AdminPage = () => {
                                         {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                     <input type="text" placeholder="Nome do Ciclo (ex: 30 Dias)" value={newPlan.name} onChange={e => setNewPlan({ ...newPlan, name: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                         <input type="number" placeholder="Dias (0=Lifetime)" value={newPlan.duration_days} onChange={e => setNewPlan({ ...newPlan, duration_days: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
                                         <input type="number" placeholder="Preço (R$)" value={newPlan.price} onChange={e => setNewPlan({ ...newPlan, price: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
                                     </div>
@@ -978,7 +978,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'categories' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
                         <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                             <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>IDENTIFICADORES</h3>
                             <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -988,7 +988,7 @@ const AdminPage = () => {
                         </div>
                         <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                             <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>TAGS OPERACIONAIS</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                            <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
                                 {categories.map(c => (
                                     <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '18px', background: 'rgba(255,255,255,0.02)', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <span style={{ fontWeight: '950', fontSize: '0.9rem' }}>{c.name.toUpperCase()}</span>
@@ -1001,7 +1001,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'updates' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%)' }}>
                                 <h3 style={{ marginBottom: '1.5rem', fontWeight: '950', letterSpacing: '1px' }}>LAUNCHER UPDATER</h3>
@@ -1063,7 +1063,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'licenses' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
                         <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                             <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>GERAÇÃO SERIAL</h3>
                             <form onSubmit={handleCreateLicense} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1116,7 +1116,7 @@ const AdminPage = () => {
                 )}
 
                 {activeTab === 'moderators' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
+                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                             <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                                 <h3 style={{ marginBottom: '1.8rem', fontWeight: '950' }}>WHITE-LIST ADMIN</h3>

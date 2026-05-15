@@ -21,8 +21,16 @@ const CustomCursor = () => {
   const cursorRef = useRef(null)
   const [active, setActive] = useState(false)
   const [hidden, setHidden] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
+    // Detect mobile device
+    setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0)
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) return // Disable custom cursor on mobile
+
     const moveCursor = (e) => {
       if (cursorRef.current) {
         cursorRef.current.style.left = `${e.clientX}px`
@@ -46,7 +54,9 @@ const CustomCursor = () => {
       document.removeEventListener('mouseleave', handleLeave)
       document.removeEventListener('mouseenter', handleEnter)
     }
-  }, [])
+  }, [isMobile])
+
+  if (isMobile) return null
 
   return (
     <div
@@ -60,7 +70,15 @@ const CustomCursor = () => {
 /* ── Mouse Spotlight ── */
 const MouseSpotlight = () => {
   const lightRef = useRef(null)
+  const [isMobile, setIsMobile] = useState(false)
+
   useEffect(() => {
+    setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0)
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) return // Disable spotlight on mobile
+
     const moveLight = (e) => {
       if (lightRef.current) {
         lightRef.current.style.background = `radial-gradient(800px circle at ${e.clientX}px ${e.clientY}px, rgba(51, 102, 255, 0.04), transparent 80%)`
@@ -68,7 +86,10 @@ const MouseSpotlight = () => {
     }
     window.addEventListener('mousemove', moveLight)
     return () => window.removeEventListener('mousemove', moveLight)
-  }, [])
+  }, [isMobile])
+
+  if (isMobile) return null
+
   return <div ref={lightRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1 }} />
 }
 

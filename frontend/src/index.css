@@ -242,3 +242,72 @@ html {
   height: 1px;
   background: rgba(255, 255, 255, 0.06);
 }
+
+/* ── Mobile Responsive ── */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Mobile cursor fix */
+@media (max-width: 768px) {
+  * {
+    cursor: auto !important;
+  }
+  
+  #custom-cursor {
+    display: none !important;
+  }
+}
+
+/* Admin panel mobile responsive */
+@media (max-width: 768px) {
+  .admin-container {
+    padding: 80px 16px 60px !important;
+    width: 100% !important;
+  }
+  
+  .admin-tabs {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .admin-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+  
+  .admin-table-container {
+    overflow-x: auto !important;
+  }
+  
+  .admin-table {
+    min-width: 600px !important;
+  }
+  
+  .admin-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .admin-card {
+    padding: 16px !important;
+  }
+  
+  .admin-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+  
+  .admin-search {
+    width: 100% !important;
+  }
+}

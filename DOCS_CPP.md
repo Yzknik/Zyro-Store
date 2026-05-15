@@ -1,22 +1,47 @@
-# 🛡️ Zyro Store - Integração C++ Premium (Auth System)
+# Zyro Store - Integração C++ Premium (Auth System)
 
 Este documento fornece uma implementação robusta, segura e "anti-crack" para integrar o sistema de autenticação da Zyro Store em seu projeto C++ (Loaders, Cheats, Ferramentas).
 
-## 🚀 Requisitos de Integração
-1.  **Visual Studio 2019+** com suporte a C++17 ou superior.
-2.  **Bibliotecas:** `WinHTTP.lib` (Linker).
-3.  **Servidor:** O backend da Zyro Store rodando e acessível.
+## Índice
+1. [Requisitos de Integração](#-requisitos-de-integração)
+2. [Configuração do Projeto](#-configuração-do-projeto)
+3. [Implementação Completa](#-implementação-completa)
+4. [Exemplo de Uso](#-exemplo-de-uso)
+5. [Integração com ImGui](#-integração-com-imgui)
+6. [Troubleshooting](#-troubleshooting)
+7. [FAQ](#-faq)
 
 ---
 
-## 🔒 Implementação de Segurança (Robust & Safe)
+## Requisitos de Integração
 
-Abaixo está o código boilerplate atualizado para suportar **Múltiplos Jogos**, **Validada de Planos** e **HWID Fix**.
+### Software Necessário
+- **Visual Studio 2019+** com suporte a C++17 ou superior
+- **Windows 10+** (para WinHTTP)
 
-### IMPLEMENTAÇÃO COMPLETA: `Auth.h`
+### Bibliotecas
+- `WinHTTP.lib` (Linker) - já incluído no Windows SDK
 
-```cpp
-#pragma once
+### URLs de Produção
+- **Frontend:** `https://zyrocheat.vercel.app`
+- **Backend API:** `https://zyroapi.shardweb.app`
+- **Endpoint de Validação:** `https://zyroapi.shardweb.app/api/launcher/validate`
+
+---
+
+## Configuração do Projeto
+
+### Passo 1: Criar Projeto C++
+1. Abra o Visual Studio
+2. Crie um novo projeto "Empty Project" (C++)
+3. Configure para C++17 ou superior
+
+### Passo 2: Configurar Linker
+1. Clique direito no projeto → Properties
+2. Linker → Input → Additional Dependencies
+3. Adicione: `WinHTTP.lib`
+
+### Passo 3: Estrutura de Arquivos
 #include <windows.h>
 #include <winhttp.h>
 #include <iostream>
@@ -41,8 +66,8 @@ namespace Zyro {
 
     class Authenticator {
     private:
-        std::wstring server_host = L"localhost"; // Mude para seu dominio em prod
-        int server_port = 5000;
+        std::wstring server_host = L"zyroapi.shardweb.app"; // URL de produção
+        int server_port = 443; // HTTPS port
 
         // Gera um HWID unico baseado no Serial do Disco e Nome do PC
         std::string GetHWID() {
@@ -282,4 +307,4 @@ ImGui::TextColored(ImVec4(1, 1, 1, 0.8f), res.username.c_str());
 > **Dica Extra:** Se você quiser que a foto fique redonda, você pode usar o `ImGui::GetWindowDrawList()->AddImageRounded()` em vez de `ImGui::Image()`.
 
 ---
-*Documentação atualizada em: 04/03/2026 por Zyro Dev Team.*
+*Documentação atualizada em: 14/05/2026 por Zyro Dev Team.*

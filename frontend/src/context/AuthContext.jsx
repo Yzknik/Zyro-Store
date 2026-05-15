@@ -2,6 +2,15 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import API_URL from '../api';
 
+// Configure axios interceptor to send token in all requests
+axios.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -13,7 +22,12 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await axios.get(`${API_URL}/api/auth/me`, { 
+                withCredentials: true,
+                headers 
+            });
             setUser(res.data.user);
             setIsAdmin(res.data.isAdmin);
             setRole(res.data.role || 'USER');
@@ -29,6 +43,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        // Check for token in URL query parameter (from OAuth redirect)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        
+        if (tokenFromUrl) {
+            // Store token and use it for authentication
+            localStorage.setItem('token', tokenFromUrl);
+            // Remove token from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
         checkAuth();
     }, []);
 
@@ -39,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await axios.get(`${API_URL}/api/auth/logout`, { withCredentials: true });
+            localStorage.removeItem('token');
             setUser(null);
             setIsAdmin(false);
             setRole('USER');
