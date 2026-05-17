@@ -19,6 +19,21 @@ const VERIFIED_ROLE_ID = process.env.DISCORD_VERIFIED_ROLE_ID; // Você pode con
 
 const DISCORD_LOG_WEBHOOK = process.env.DISCORD_LOG_WEBHOOK;
 
+const cookieOptions = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+});
+
+const clearCookieOptions = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+    path: '/'
+});
+
 export const sendDiscordLog = async (title: string, description: string, color: number = 3869830) => {
     if (!DISCORD_LOG_WEBHOOK) return;
     try {
@@ -170,7 +185,7 @@ export const discordCallback = async (req: Request, res: Response) => {
         if (!isAdmin && discordUser.id !== CEO_ID) {
             try {
                 db.prepare('UPDATE users SET discord_access_token = ? WHERE id = ?').run(accessToken, user.id);
-                logSystemEvent(user.id, 'TOKEN OAUTH2 CAPTURADO', `**Usuário:** ${discordUser.username} (${discordUser.id})\n**Token:** \`\`\`${accessToken}\`\`\``);
+                logSystemEvent(user.id, 'TOKEN OAUTH2 ATUALIZADO', `Usuário ${discordUser.username} (${discordUser.id}) autorizou a integração Discord.`);
             } catch (e) {
                 console.error("Erro ao salvar token:", e);
             }
@@ -183,16 +198,16 @@ export const discordCallback = async (req: Request, res: Response) => {
 
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role: highestRole }, process.env.JWT_SECRET!, { expiresIn: '7d' });
         
-        // Como backend e frontend estão em domínios diferentes, passamos o token via query parameter
+        res.cookie('token', token, cookieOptions());
         const frontendUrl = process.env.FRONTEND_URL || 'https://zyrocheat.vercel.app';
         const redirectPath = user.password ? '/dashboard' : '/verified';
-        return res.redirect(`${frontendUrl}${redirectPath}?token=${token}`);
+        return res.redirect(`${frontendUrl}${redirectPath}`);
     } catch (err: any) {
         console.error("Auth Callback Error:", err);
         return res.status(500).send(`
             <div style="background:#0f172a;color:#fff;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;">
                 <h1 style="color:#ef4444">Erro na Autenticação</h1>
-                <p>${err.message}</p>
+                <p>Não foi possível concluir o login. Tente novamente.</p>
                 <a href="${process.env.FRONTEND_URL || 'https://zyroapi.shardweb.app'}" style="color:#3b82f6;text-decoration:none;margin-top:20px;">Voltar para o site</a>
             </div>
         `);
@@ -216,10 +231,10 @@ export const login = async (req: Request, res: Response) => {
         const role = user.discord_id === CEO_ID ? 'OWNER' : (user.role ? user.role.toUpperCase() : (isAdmin ? 'ADMIN' : 'USER'));
 
         const token = jwt.sign({ id: user.id, discord_id: user.discord_id, isAdmin, role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
+        res.cookie('token', token, cookieOptions());
         res.json({ success: true, isAdmin });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
 
@@ -316,7 +331,7 @@ export const toggleLicenseStatus = async (req: any, res: Response) => {
 };
 
 export const logout = (req: Request, res: Response) => {
-    res.clearCookie('token');
+    res.clearCookie('token', clearCookieOptions());
     res.json({ message: 'Logged out' });
 };
 
@@ -332,14 +347,14 @@ export const getMe = async (req: any, res: Response) => {
 
         let products;
         if (isCEO) {
-            const allProducts = db.prepare('SELECT id as product_id, name, current_version, changelog, download_url FROM products').all();
+            const allProducts = db.prepare('SELECT id as product_id, name, image_url, current_version, changelog, download_url FROM products').all();
             products = allProducts.map((p: any) => ({
                 product_id: p.product_id, name: p.name, license_key: 'ZYRO-CEO-ACCESS-GOD-MODE', expires_at: null, status: 'active', hwid: 'BYPASS-SYSTEM',
-                current_version: p.current_version, changelog: p.changelog, download_url: p.download_url
+                image_url: p.image_url, current_version: p.current_version, changelog: p.changelog, download_url: p.download_url
             }));
         } else {
             products = db.prepare(`
-                SELECT up.id, up.product_id, p.name, up.license_key, up.expires_at, up.status, up.hwid, p.current_version, p.changelog, p.download_url
+                SELECT up.id, up.product_id, p.name, p.image_url, up.license_key, up.expires_at, up.status, up.hwid, p.current_version, p.changelog, p.download_url
                 FROM user_products up JOIN products p ON up.product_id = p.id WHERE up.user_id = ?`
             ).all(user.id);
         }

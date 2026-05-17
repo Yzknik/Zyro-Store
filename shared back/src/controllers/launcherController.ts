@@ -11,6 +11,22 @@ const toInt = (value: any): number => {
     return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const clientIp = (req: Request): string => {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (Array.isArray(forwarded)) return String(forwarded[0] || '').split(',')[0]?.trim() || '';
+    if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0]?.trim() || '';
+    return String(req.socket.remoteAddress || '');
+};
+
+const launcherError = (res: Response, status: number, message: string, details?: string) => {
+    return res.status(status).json({
+        authorized: "false",
+        success: false,
+        message,
+        ...(process.env.NODE_ENV === 'production' || !details ? {} : { details })
+    });
+};
+
 export const getLatestVersion = (req: Request, res: Response) => {
     try {
         const versionSetting = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
@@ -48,8 +64,8 @@ const compareVersions = (v1: string, v2: string): number => {
     const parts2 = v2.split('.').map(Number);
     
     for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-        const num1 = parts1[i] || 0;
-        const num2 = parts2[i] || 0;
+        const num1 = parts1[i] ?? 0;
+        const num2 = parts2[i] ?? 0;
         
         if (num1 < num2) return -1;
         if (num1 > num2) return 1;
@@ -61,25 +77,25 @@ const compareVersions = (v1: string, v2: string): number => {
 export const validateProduct = async (req: Request, res: Response) => {
     try {
         if (!req.body) {
-            return res.status(400).json({ authorized: "false", message: 'Corpo da requisição ausente.' });
+            return launcherError(res, 400, 'Corpo da requisição ausente.');
         }
         const { username, password, hwid, product_name, integrity_hash } = req.body;
 
         // 0. Verifica Integridade do Launcher (Opcional se enviado no login)
         const serverHash = db.prepare("SELECT value FROM settings WHERE key = 'launcher_integrity_hash'").get() as any;
         if (integrity_hash && integrity_hash !== serverHash?.value) {
-            return res.status(403).json({ authorized: "false", message: 'Launcher modificado detectado. Rebaixe no site.' });
+            return launcherError(res, 403, 'Launcher modificado detectado. Baixe novamente no site.');
         }
 
         if (!username || !password) {
-            return res.status(400).json({ authorized: "false", message: 'Identificadores ausentes.' });
+            return launcherError(res, 400, 'Identificadores ausentes.');
         }
 
         // 1. Busca o usuário
         const user: any = db.prepare('SELECT id, discord_id, username, password, avatar FROM users WHERE username = ?').get(username);
 
         if (!user || !user.password) {
-            return res.status(401).json({ authorized: "false", message: 'Usuário não vinculado ao sistema.' });
+            return launcherError(res, 401, 'Usuário não vinculado ao sistema.');
         }
 
         // Convert user.id to integer immediately to prevent float issues
@@ -89,21 +105,26 @@ export const validateProduct = async (req: Request, res: Response) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             // SECURITY: Log failed login attempt
-            console.warn(`[SECURITY] Failed login attempt for user '${username}' from IP ${req.headers['x-forwarded-for'] || req.socket.remoteAddress} - Wrong password`);
-            return res.status(401).json({ authorized: "false", message: 'Senha incorreta.' });
+            console.warn(`[SECURITY] Failed login attempt for user '${username}' from IP ${clientIp(req)} - Wrong password`);
+            return launcherError(res, 401, 'Senha incorreta.');
         }
 
         // 3. Verifica se o usuário é Admin/Owner
         const admin = db.prepare('SELECT id FROM admin_whitelist WHERE discord_id = ?').get(user.discord_id);
         const isAdmin = !!admin;
         const role = isAdmin ? 'Owner' : 'User';
+        const receivedHwid = String(hwid || '').trim();
 
-        let activeLicenses = [];
+        if (!isAdmin && !receivedHwid) {
+            return launcherError(res, 400, 'HWID ausente.');
+        }
+
+        let activeLicenses: any[] = [];
 
         if (isAdmin) {
             // Se for admin, libera TODOS os produtos da loja
             const allProducts: any[] = db.prepare(`
-                SELECT p.id as product_id, p.name as product_name, p.status as detection_status, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key, p.current_version, p.download_url, p.changelog
+                SELECT p.id as product_id, p.name as product_name, p.image_url, p.status as detection_status, 'Lifetime' as plan_name, NULL as expires_at, 'ADMIN-BYPASS' as license_key, p.current_version, p.download_url, p.changelog
                 FROM products p
             `).all();
             // Convert product_id to integer for all admin products
@@ -115,7 +136,7 @@ export const validateProduct = async (req: Request, res: Response) => {
             // Se for usuário comum, busca as licenças dele
             const userId = toInt(user.id);
             const licenses: any[] = db.prepare(`
-                SELECT up.id as id, up.user_id as user_id, up.product_id as product_id, up.license_key, up.hwid, up.expires_at, up.status, up.assigned_at, p.name as product_name, p.status as detection_status, pl.name as plan_name, p.current_version, p.download_url, p.changelog
+                SELECT up.id as id, up.user_id as user_id, up.product_id as product_id, up.license_key, up.hwid, up.expires_at, up.status, up.assigned_at, p.name as product_name, p.image_url, p.status as detection_status, pl.name as plan_name, p.current_version, p.download_url, p.changelog
                 FROM user_products up 
                 JOIN products p ON up.product_id = p.id 
                 LEFT JOIN plans pl ON up.plan_id = pl.id
@@ -134,7 +155,6 @@ export const validateProduct = async (req: Request, res: Response) => {
                     continue;
                 }
 
-                const receivedHwid = String(hwid || '').trim();
                 const storedHwid = String(lic.hwid || '').trim();
 
                 // HWID Lock Logic
@@ -145,25 +165,22 @@ export const validateProduct = async (req: Request, res: Response) => {
                     console.log(`[HWID-LOCK] Bound software ${lic.product_name} to HWID: ${receivedHwid} for user ${user.username}`);
                 } else if (storedHwid !== receivedHwid) {
                     console.warn(`[HWID-MISMATCH] User ${user.username} tried ${lic.product_name} from ${receivedHwid} (Expected: ${storedHwid})`);
-                    return res.status(403).json({
-                        authorized: "false",
-                        message: `Acesso negado: Este produto está bloqueado para outra máquina (${lic.product_name}). Reset o HWID no site.`
-                    });
+                    return launcherError(res, 403, `Acesso negado: Este produto está bloqueado para outra máquina (${lic.product_name}). Reset o HWID no site.`);
                 }
                 activeLicenses.push(lic);
             }
         }
 
         if (activeLicenses.length === 0 && !isAdmin) {
-            return res.status(403).json({ authorized: "false", message: 'Você não possui licenças ativas.' });
+            return launcherError(res, 403, 'Você não possui licenças ativas.');
         }
 
         // 4. Grava Histórico de Login e IP
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const ip = clientIp(req);
         const userId = toInt(user.id);
         try {
-            db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(userId, String(ip), hwid);
-            db.prepare('UPDATE users SET last_ip = ?, last_login = datetime(\'now\') WHERE id = ?').run(String(ip), userId);
+            db.prepare('INSERT INTO login_history (user_id, ip_address, hwid) VALUES (?, ?, ?)').run(userId, ip, receivedHwid);
+            db.prepare('UPDATE users SET last_ip = ?, last_login = datetime(\'now\') WHERE id = ?').run(ip, userId);
         } catch (logErr: any) {
             console.error('[WARN] Failed to log login history:', logErr.message);
         }
@@ -172,7 +189,20 @@ export const validateProduct = async (req: Request, res: Response) => {
         const broadcast = db.prepare("SELECT value FROM settings WHERE key = 'broadcast_message'").get() as any;
 
         // 6. Build Products Response with proper error handling
-        let productsResponse = [];
+        let productsResponse: Array<{
+            id: number;
+            name: string;
+            image_url: string;
+            version: string;
+            payload_id: number | null;
+            download_url: string;
+            has_cloud_bin: boolean;
+            changelog: string;
+            plan: string;
+            expiry: string;
+            key: string;
+            status: string;
+        }> = [];
         try {
             productsResponse = activeLicenses.map(l => {
                 // Get most recent stable version for this specific product (only if product_id exists)
@@ -191,6 +221,7 @@ export const validateProduct = async (req: Request, res: Response) => {
                 return {
                     id: l.product_id,
                     name: l.product_name,
+                    image_url: l.image_url || '',
                     version: latestVersion?.version || l.current_version || '1.0.0',
                     payload_id: latestVersion?.id || null,
                     download_url: latestVersion?.download_url || l.download_url || '',
@@ -230,8 +261,8 @@ export const validateProduct = async (req: Request, res: Response) => {
         });
 
     } catch (err: any) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('[LAUNCHER-VALIDATE]', err);
+        return launcherError(res, 500, 'Erro interno ao validar acesso.', err?.message);
     }
 };
 
@@ -240,12 +271,12 @@ export const heartbeat = (req: Request, res: Response) => {
         const { username, session_token } = req.body;
         if (!username) return res.status(400).json({ error: 'Username required' });
 
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        db.prepare('UPDATE users SET last_heartbeat = datetime(\'now\'), last_ip = ? WHERE username = ?').run(String(ip), username);
+        const ip = clientIp(req);
+        db.prepare('UPDATE users SET last_heartbeat = datetime(\'now\'), last_ip = ? WHERE username = ?').run(ip, username);
 
         res.json({ status: 'alive' });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
 
@@ -260,7 +291,7 @@ export const checkIntegrity = (req: Request, res: Response) => {
             res.json({ secure: false, message: 'Nova versão disponível ou arquivo modificado.' });
         }
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
 
@@ -281,7 +312,7 @@ export const downloadPayload = (req: Request, res: Response) => {
         // Stream do arquivo para o launcher
         res.download(fullPath, `payload_${id}.exe`);
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
 
@@ -303,6 +334,6 @@ export const downloadMain = (req: Request, res: Response) => {
 
         res.status(404).json({ error: 'Ficheiro do Launcher não configurado.' });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };

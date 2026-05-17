@@ -7,6 +7,7 @@ import { useNotification } from '../context/NotificationContext'
 import { Navigate } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
+import { Zap } from 'lucide-react'
 
 const WithdrawModal = ({ balance, isOpen, onClose, onRefresh }) => {
     const [amount, setAmount] = useState('');

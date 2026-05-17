@@ -55,6 +55,20 @@ export const createProduct = (req: Request, res: Response) => {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
+export const updateProduct = (req: Request, res: Response) => {
+    try {
+        const id = getId(req.params.id);
+        const payload = { ...req.body };
+        Product.update(id, payload);
+
+        const reqUser = (req as any).user;
+        if (reqUser) logSystemEvent(reqUser.id, 'PRODUTO EDITADO', `Atualizou produto ID: ${id}`);
+
+        const updated = Product.getById(id);
+        res.json({ success: true, product: updated });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
 export const deleteProduct = (req: Request, res: Response) => {
     try {
         Product.delete(getId(req.params.id));
@@ -265,6 +279,19 @@ export const getPublicInfo = async (req: Request, res: Response) => {
     try {
         const news = News.getAll().slice(0, 5);
         const settings = Settings.getAll();
+        const products = db.prepare(`
+            SELECT p.id, p.name, p.description, p.image_url, p.status, p.current_version, p.download_url, p.changelog,
+                   (SELECT lv.created_at FROM launcher_versions lv WHERE lv.product_id = p.id ORDER BY lv.created_at DESC LIMIT 1) as last_release_at
+            FROM products p
+            ORDER BY p.id DESC
+        `).all() as any[];
+        const launcher = {
+            version: settings.launcher_main_version || settings.launcher_version || '1.0.0',
+            download_url: settings.launcher_main_url || settings.launcher_download_url || '',
+            status: settings.launcher_status || 'ONLINE',
+            changelog: settings.launcher_changelog || '',
+            updated_at: settings.launcher_updated_at || ''
+        };
 
         // Calcular estatísticas reais
         const dbUsers = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
@@ -281,7 +308,7 @@ export const getPublicInfo = async (req: Request, res: Response) => {
         settings.total_sales_count = totalSales.count;
         settings.active_subs_count = activeLicenses.count;
 
-        res.json({ news, settings });
+        res.json({ news, settings, products, launcher });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
@@ -428,19 +455,21 @@ export const setResellerBalance = (req: Request, res: Response) => {
 // --- Launcher Version Management ---
 export const updateLauncherVersion = (req: Request, res: Response) => {
     try {
-        const { version, download_url } = req.body;
+        const { version, download_url, status, changelog } = req.body;
         
         if (!version) return res.status(400).json({ error: 'Versão é obrigatória.' });
         if (!download_url) return res.status(400).json({ error: 'URL de download é obrigatória.' });
 
-        // Update launcher settings
-        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(version, 'launcher_main_version');
-        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(download_url, 'launcher_main_url');
+        Settings.update('launcher_main_version', version);
+        Settings.update('launcher_main_url', download_url);
+        Settings.update('launcher_status', status || 'ONLINE');
+        Settings.update('launcher_changelog', changelog || '');
+        Settings.update('launcher_updated_at', new Date().toISOString());
 
         const reqUser = (req as any).user;
         if (reqUser) logSystemEvent(reqUser.id, 'ATUALIZAÇÃO LAUNCHER', `Atualizou launcher para versão ${version} - URL: ${download_url}`);
 
-        res.json({ success: true, version, download_url });
+        res.json({ success: true, version, download_url, status: status || 'ONLINE', changelog: changelog || '' });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
@@ -448,10 +477,14 @@ export const getLauncherVersion = (req: Request, res: Response) => {
     try {
         const version = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_version'").get() as any;
         const url = db.prepare("SELECT value FROM settings WHERE key = 'launcher_main_url'").get() as any;
+        const status = db.prepare("SELECT value FROM settings WHERE key = 'launcher_status'").get() as any;
+        const changelog = db.prepare("SELECT value FROM settings WHERE key = 'launcher_changelog'").get() as any;
         
         res.json({
             version: version?.value || '1.0.0',
-            download_url: url?.value || ''
+            download_url: url?.value || '',
+            status: status?.value || 'ONLINE',
+            changelog: changelog?.value || ''
         });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };

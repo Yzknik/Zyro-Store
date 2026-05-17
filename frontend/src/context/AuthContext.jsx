@@ -2,11 +2,10 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import API_URL from '../api';
 
-// Configure axios interceptor to send token in all requests
 axios.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    const legacyToken = sessionStorage.getItem('legacy_auth_token');
+    if (legacyToken) {
+        config.headers.Authorization = `Bearer ${legacyToken}`;
     }
     return config;
 });
@@ -22,12 +21,7 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            const res = await axios.get(`${API_URL}/api/auth/me`, { 
-                withCredentials: true,
-                headers 
-            });
+            const res = await axios.get(`${API_URL}/api/auth/me`);
             setUser(res.data.user);
             setIsAdmin(res.data.isAdmin);
             setRole(res.data.role || 'USER');
@@ -43,17 +37,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        // Check for token in URL query parameter (from OAuth redirect)
+        // Temporary compatibility with the currently deployed backend. The new
+        // backend uses httpOnly cookies and will not send tokens in the URL.
         const urlParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = urlParams.get('token');
-        
+
         if (tokenFromUrl) {
-            // Store token and use it for authentication
-            localStorage.setItem('token', tokenFromUrl);
-            // Remove token from URL
+            sessionStorage.setItem('legacy_auth_token', tokenFromUrl);
+            localStorage.removeItem('token');
             window.history.replaceState({}, document.title, window.location.pathname);
         }
-        
+
         checkAuth();
     }, []);
 
@@ -63,7 +57,8 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
-            await axios.get(`${API_URL}/api/auth/logout`, { withCredentials: true });
+            await axios.get(`${API_URL}/api/auth/logout`);
+            sessionStorage.removeItem('legacy_auth_token');
             localStorage.removeItem('token');
             setUser(null);
             setIsAdmin(false);

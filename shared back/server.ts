@@ -11,16 +11,25 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1); // Trust 1 proxy hop (Vercel/cloud)
 app.disable('x-powered-by'); // Security: Hide server info
-const PORT = Number(process.env.PORT || 80);
+const PORT = Number(process.env.APP_PORT || 80);
+const HOST = process.env.HOST || '0.0.0.0';
+const API_VERSION = '2.0.0-SECURED';
 
 // Body parser middleware (must be before routes)
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'https://zyrocheat.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+].filter(Boolean) as string[];
+
 // CORS configuration
 app.use(cors({
-    origin: ['https://zyrocheat.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -42,7 +51,7 @@ const globalLimiter = rateLimit({
 const strictLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200, // Increased for admin dashboard with multiple data fetches
-    message: { error: 'Limites de segurança atingidos. Tente novamente mais tarde.' }
+    message: { error: 'Limites de seguranca atingidos. Tente novamente mais tarde.' }
 });
 
 const loginLimiter = rateLimit({
@@ -57,7 +66,16 @@ app.use(['/api/admin', '/api/launcher/payload', '/api/launcher/validate', '/api/
 
 // Default Route
 app.get('/', (req: Request, res: Response) => {
-    res.json({ message: 'Zyro Backend API (TypeScript) is running', version: '2.0.0-SECURED' });
+    res.json({ message: 'Zyro Backend API (TypeScript) is running', version: API_VERSION });
+});
+
+app.get('/api/health', (req: Request, res: Response) => {
+    res.json({
+        success: true,
+        status: 'ok',
+        version: API_VERSION,
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Import Routes with .js extension for ESM
@@ -83,7 +101,7 @@ app.use('/api/reseller', resellerRoutes);
 app.use('/api/payment', paymentRoutes);
 
 app.use('/api', (req: Request, res: Response) => {
-    res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint não encontrado.' });
+    res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint nao encontrado.' });
 });
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -94,13 +112,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const isProd = process.env.NODE_ENV === 'production';
     res.status(err.status || 500).json({
         error: 'SERVICE_ERROR',
-        message: isProd ? 'Ocorreu um erro interno de segurança. Contate o administrador.' : err.message,
+        message: isProd ? 'Ocorreu um erro interno de seguranca. Contate o administrador.' : err.message,
         ref: errorId
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Zyro Secure Backend running on port ${PORT}`);
+app.listen(PORT, HOST, () => {
+    console.log(`Zyro Secure Backend running on http://${HOST}:${PORT}`);
 });
 
 // Vercel handler

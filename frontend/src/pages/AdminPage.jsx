@@ -269,6 +269,7 @@ const AdminPage = () => {
     const [allSettings, setAllSettings] = useState([])
     const [newNews, setNewNews] = useState({ title: '', description: '' })
     const [localSettings, setLocalSettings] = useState({})
+    const [editingProduct, setEditingProduct] = useState(null)
 
     const [versionList, setVersionList] = useState([])
     const [versionFile, setVersionFile] = useState(null)
@@ -366,7 +367,7 @@ const AdminPage = () => {
         e.preventDefault()
         try {
             await axios.post(`${API_URL}/api/admin/products`, newProduct, { withCredentials: true })
-            setNewProduct({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '' })
+            setNewProduct({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
             fetchProducts(); notify('PRODUTO LANÇADO COM SUCESSO!')
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
     }
@@ -375,6 +376,33 @@ const AdminPage = () => {
         askConfirm('DELETAR PRODUTO?', 'Todos os planos e licenças deste produto serão removidos permanentemente.', 'REMOVER TUDO', async () => {
             try { await axios.delete(`${API_URL}/api/admin/products/${id}`, { withCredentials: true }); fetchProducts(); notify('PRODUTO REMOVIDO.') } catch (e) { }
         })
+    }
+
+    const startEditProduct = (product) => {
+        setEditingProduct({
+            ...product,
+            category_id: product.category_id || '',
+            current_version: product.current_version || '1.0.0',
+            status: product.status || 'UNDETECTED',
+            download_url: product.download_url || '',
+            changelog: product.changelog || '',
+            image_url: product.image_url || '',
+            description: product.description || '',
+            integrity_hash: product.integrity_hash || ''
+        })
+    }
+
+    const handleUpdateProduct = async (e) => {
+        e.preventDefault()
+        if (!editingProduct?.id) return
+        try {
+            await axios.patch(`${API_URL}/api/admin/products/${editingProduct.id}`, editingProduct, { withCredentials: true })
+            setEditingProduct(null)
+            await fetchProducts()
+            notify('PRODUTO ATUALIZADO!')
+        } catch (err) {
+            notify(err.response?.data?.error || 'ERRO AO ATUALIZAR PRODUTO', 'error')
+        }
     }
 
     const handleCreatePlan = async (e) => {
@@ -754,22 +782,29 @@ const AdminPage = () => {
                         <div>
                             <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '20px', marginBottom: '30px' }}>
                                 <h2 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '1px' }}>LANÇAR ATUALIZAÇÃO</h2>
-                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Envie novas versões e changelogs para os produtos.</p>
+                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Produto / Versao / GitHub Release URL / Changelog.</p>
                             </div>
                             <form className="card" onSubmit={handleCreateVersion} style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '4px' }}>
+                                    {['Produto', 'Versao', 'Release URL', 'Changelog'].map((step, index) => (
+                                        <div key={step} style={{ padding: '10px 8px', borderRadius: '10px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.16)', color: '#93c5fd', fontSize: '0.62rem', fontWeight: '900', textAlign: 'center', letterSpacing: '0.08em' }}>
+                                            {index + 1}. {step.toUpperCase()}
+                                        </div>
+                                    ))}
+                                </div>
                                 <select required className="input" value={newVersion.product_id} onChange={e => setNewVersion({ ...newVersion, product_id: e.target.value })}>
                                     <option value="">SELECIONE O PRODUTO</option>
                                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                                 <input required type="text" placeholder="Versão (ex: v1.0.4)" className="input" value={newVersion.version} onChange={e => setNewVersion({ ...newVersion, version: e.target.value })} />
-                                <input type="url" placeholder="Link de Download (Opcional se subir arquivo)" className="input" value={newVersion.download_url} onChange={e => setNewVersion({ ...newVersion, download_url: e.target.value })} />
+                                <input type="url" placeholder="GitHub Release URL (.zip / .exe / .bin)" className="input" value={newVersion.download_url} onChange={e => setNewVersion({ ...newVersion, download_url: e.target.value })} />
 
                                 <div style={{ border: '2px dashed rgba(255,255,255,0.06)', borderRadius: '15px', padding: '20px', textAlign: 'center', transition: '0.3s' }}>
                                     <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: versionFile ? '#22c55e' : 'rgba(255,255,255,0.3)', letterSpacing: '1px' }}>
-                                        {versionFile ? `FILE: ${versionFile.name.toUpperCase()}` : 'SUBIR BINÁRIO (.EXE / .BIN)'}
+                                        {versionFile ? `FILE: ${versionFile.name.toUpperCase()}` : 'UPLOAD LOCAL OPCIONAL (.EXE / .BIN)'}
                                     </p>
                                     <input type="file" onChange={e => setVersionFile(e.target.files[0])} style={{ position: 'absolute', opacity: 0, cursor: 'pointer', height: '40px', width: '200px', transform: 'translateX(-100px)' }} />
-                                    {!versionFile && <p style={{ margin: 0, fontSize: '0.6rem', color: 'rgba(255,255,255,0.15)', marginTop: '5px' }}>O launcher baixará este arquivo da nuvem automaticamente.</p>}
+                                    {!versionFile && <p style={{ margin: 0, fontSize: '0.6rem', color: 'rgba(255,255,255,0.22)', marginTop: '5px' }}>Preferido: cole o link do GitHub Release acima.</p>}
                                 </div>
 
                                 <textarea placeholder="O que mudou? (Changelog)" className="input" style={{ minHeight: '100px' }} value={newVersion.changelog} onChange={e => setNewVersion({ ...newVersion, changelog: e.target.value })} />
@@ -916,12 +951,38 @@ const AdminPage = () => {
                                     </select>
                                     <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                                         <input type="text" placeholder="Versão (ex: 1.0.2)" value={newProduct.current_version} onChange={e => setNewProduct({ ...newProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
-                                        <input type="text" placeholder="URL Direta de Download (.exe / .zip)" value={newProduct.download_url} onChange={e => setNewProduct({ ...newProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                        <input type="text" placeholder="GitHub Release URL inicial (.exe / .zip)" value={newProduct.download_url} onChange={e => setNewProduct({ ...newProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
                                     </div>
                                     <textarea placeholder="Changelog / Notas da Versão" value={newProduct.changelog} onChange={e => setNewProduct({ ...newProduct, changelog: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '80px', resize: 'vertical' }} />
                                     <button type="submit" className="btn-primary" style={{ height: '55px', borderRadius: '18px', fontWeight: '950' }}>PUBLICAR SOFTWARE</button>
                                 </form>
                             </div>
+                            {editingProduct && (
+                                <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px', border: '1px solid rgba(59,130,246,0.25)' }}>
+                                    <h3 style={{ marginBottom: '1.8rem', fontWeight: '950', letterSpacing: '1px', color: '#93c5fd' }}>EDITAR PRODUTO</h3>
+                                    <form onSubmit={handleUpdateProduct} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <input type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
+                                        <textarea value={editingProduct.description} onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '80px', resize: 'vertical' }} />
+                                        <select value={editingProduct.status} onChange={e => setEditingProduct({ ...editingProduct, status: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                            <option value="UNDETECTED">UNDETECTED</option>
+                                            <option value="MAINTENANCE">MAINTENANCE</option>
+                                            <option value="TESTING">TESTING</option>
+                                            <option value="DETECTED">DETECTED</option>
+                                            <option value="OFFLINE">OFFLINE</option>
+                                        </select>
+                                        <input type="text" placeholder="URL da imagem" value={editingProduct.image_url} onChange={e => setEditingProduct({ ...editingProduct, image_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                        <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                                            <input type="text" placeholder="Versao" value={editingProduct.current_version} onChange={e => setEditingProduct({ ...editingProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
+                                            <input type="text" placeholder="GitHub Release URL" value={editingProduct.download_url} onChange={e => setEditingProduct({ ...editingProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
+                                        </div>
+                                        <textarea placeholder="Changelog" value={editingProduct.changelog} onChange={e => setEditingProduct({ ...editingProduct, changelog: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '90px', resize: 'vertical' }} />
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                            <button type="submit" className="btn-primary" style={{ height: '50px', borderRadius: '15px', fontWeight: '950' }}>SALVAR</button>
+                                            <button type="button" onClick={() => setEditingProduct(null)} style={{ height: '50px', borderRadius: '15px', fontWeight: '950', background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>CANCELAR</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
                             <div className="glass" style={{ padding: '2.5rem', borderRadius: '35px' }}>
                                 <h3 style={{ marginBottom: '1.8rem', fontWeight: '950', letterSpacing: '1px' }}>GERENCIAR PLANOS</h3>
                                 <form onSubmit={handleCreatePlan} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -959,7 +1020,10 @@ const AdminPage = () => {
                                                 <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '950', opacity: 0.3, letterSpacing: '2px', marginTop: '4px' }}>{p.category_name || 'NO CATEGORY'} • v{p.current_version || '1.0.0'}</p>
                                                 {p.changelog && <p style={{ margin: 0, fontSize: '0.6rem', color: '#3b82f6', marginTop: '5px', cursor: 'pointer' }} onClick={() => alert(`CHANGELOG v${p.current_version}:\n\n${p.changelog}`)}>VER NOTAS DA VERSÃO</p>}
                                             </div>
-                                            <button onClick={() => handleDeleteProduct(p.id)} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: 'none', cursor: 'pointer', padding: '8px 15px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '950' }}>DELETAR</button>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button onClick={() => startEditProduct(p)} style={{ color: '#93c5fd', background: 'rgba(59, 130, 246, 0.1)', border: 'none', cursor: 'pointer', padding: '8px 15px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '950' }}>EDITAR</button>
+                                                <button onClick={() => handleDeleteProduct(p.id)} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: 'none', cursor: 'pointer', padding: '8px 15px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '950' }}>DELETAR</button>
+                                            </div>
                                         </div>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                                             {p.plans && p.plans.map(plan => (
@@ -1011,8 +1075,8 @@ const AdminPage = () => {
                                         <label style={{ fontSize: '0.65rem', fontWeight: '900', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>VERSÃO ATUAL DO LAUNCHER</label>
                                         <input
                                             type="text"
-                                            value={localSettings.launcher_version || ''}
-                                            onChange={e => setLocalSettings({ ...localSettings, launcher_version: e.target.value })}
+                                            value={localSettings.launcher_main_version || ''}
+                                            onChange={e => setLocalSettings({ ...localSettings, launcher_main_version: e.target.value })}
                                             placeholder="ex: 1.5.0"
                                             style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }}
                                         />
@@ -1021,16 +1085,39 @@ const AdminPage = () => {
                                         <label style={{ fontSize: '0.65rem', fontWeight: '900', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>LINK DE DOWNLOAD DO NOVO .EXE</label>
                                         <input
                                             type="text"
-                                            value={localSettings.launcher_download_url || ''}
-                                            onChange={e => setLocalSettings({ ...localSettings, launcher_download_url: e.target.value })}
+                                            value={localSettings.launcher_main_url || ''}
+                                            onChange={e => setLocalSettings({ ...localSettings, launcher_main_url: e.target.value })}
                                             placeholder="https://..."
                                             style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }}
                                         />
                                     </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', fontWeight: '900', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>STATUS DO LAUNCHER</label>
+                                        <select
+                                            value={localSettings.launcher_status || 'ONLINE'}
+                                            onChange={e => setLocalSettings({ ...localSettings, launcher_status: e.target.value })}
+                                            style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }}
+                                        >
+                                            <option value="ONLINE">ONLINE</option>
+                                            <option value="MAINTENANCE">MAINTENANCE</option>
+                                            <option value="UPDATING">UPDATING</option>
+                                        </select>
+                                    </div>
+                                    <textarea
+                                        placeholder="Notas da atualizacao do launcher"
+                                        value={localSettings.launcher_changelog || ''}
+                                        onChange={e => setLocalSettings({ ...localSettings, launcher_changelog: e.target.value })}
+                                        style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', minHeight: '85px', resize: 'vertical' }}
+                                    />
                                     <button
-                                        onClick={() => {
-                                            handleUpdateSetting('launcher_version', localSettings.launcher_version);
-                                            handleUpdateSetting('launcher_download_url', localSettings.launcher_download_url);
+                                        onClick={async () => {
+                                            await axios.post(`${API_URL}/api/admin/launcher-version`, {
+                                                version: localSettings.launcher_main_version,
+                                                download_url: localSettings.launcher_main_url,
+                                                status: localSettings.launcher_status,
+                                                changelog: localSettings.launcher_changelog
+                                            }, { withCredentials: true });
+                                            fetchSettings();
                                             notify('SISTEMA DE AUTO-UPDATE ATUALIZADO!');
                                         }}
                                         className="btn-primary"

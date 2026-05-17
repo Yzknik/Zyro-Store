@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import AdminPage from './pages/AdminPage'
 import ResellerPage from './pages/ResellerPage'
 import ErrorPage from './pages/ErrorPage'
+import CommunityPage from './pages/CommunityPage'
 import { translations } from './i18n'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -133,11 +134,12 @@ function App() {
               <ScrollReveal />
               <CustomCursor />
               <MouseSpotlight />
-              <div style={{ background: '#0a0a0a', minHeight: '100vh', position: 'relative' }}>
+              <div className="app-shell" style={{ background: '#0a0a0a', minHeight: '100vh', position: 'relative' }}>
                 <Routes>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/community" element={<CommunityPage />} />
                   <Route path="/tos" element={<TosPage />} />
                   <Route path="/verified" element={<VerifiedPage />} />
                   <Route path="/dashboard" element={<DashboardPage />} />

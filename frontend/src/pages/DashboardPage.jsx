@@ -8,6 +8,7 @@ import { useModal } from '../context/ModalContext'
 import { Navigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
+import { Boxes, Crown, Gauge, LifeBuoy, Settings2, ShieldCheck, Zap } from 'lucide-react'
 
 const DashboardPage = () => {
     const { t } = useContext(LangContext)
@@ -27,12 +28,13 @@ const DashboardPage = () => {
     const [selectedConfigProduct, setSelectedConfigProduct] = useState(null)
 
     useEffect(() => {
+        if (loading || !user) return
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
         fetchInfo()
         fetchHistory()
         fetchTickets()
         return () => clearInterval(timer)
-    }, [])
+    }, [loading, user])
 
     const fetchInfo = async () => {
         try {
@@ -134,16 +136,19 @@ const DashboardPage = () => {
                     {/* Navigation Tab */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {[
-                            { id: 'overview', label: 'Overview' },
-                            { id: 'licenses', label: 'My Products' },
-                            { id: 'configs', label: 'Cloud Configs' },
-                            { id: 'security', label: 'HWID & History' },
-                            { id: 'tickets', label: 'Support Tickets' }
+                            { id: 'overview', label: 'Overview', icon: Gauge },
+                            { id: 'licenses', label: 'My Products', icon: Boxes },
+                            { id: 'configs', label: 'Cloud Configs', icon: Settings2 },
+                            { id: 'security', label: 'HWID & History', icon: ShieldCheck },
+                            { id: 'tickets', label: 'Support Tickets', icon: LifeBuoy }
                         ].map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
                                     textAlign: 'left',
                                     padding: '12px 16px',
                                     borderRadius: '6px',
@@ -156,6 +161,7 @@ const DashboardPage = () => {
                                     transition: '0.2s'
                                 }}
                             >
+                                <tab.icon size={16} strokeWidth={2.2} />
                                 {tab.label}
                             </button>
                         ))}
@@ -173,9 +179,12 @@ const DashboardPage = () => {
                                 fontWeight: '900',
                                 border: '1px solid rgba(34, 197, 94, 0.2)',
                                 transition: '0.3s',
-                                letterSpacing: '1px'
+                                letterSpacing: '1px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
                             }}>
-                                RESELLER HUB
+                                <Zap size={16} strokeWidth={2.3} /> RESELLER HUB
                             </Link>
                         )}
                         {isAdmin && (
@@ -186,9 +195,12 @@ const DashboardPage = () => {
                                     border: '1px solid rgba(239, 68, 68, 0.1)',
                                     color: '#ef4444',
                                     fontSize: '0.9rem',
-                                    fontWeight: '600'
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
                                 }}>
-                                    Admin Panel
+                                    <Crown size={16} strokeWidth={2.3} /> Admin Panel
                                 </div>
                             </Link>
                         )}

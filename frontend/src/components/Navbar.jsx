@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { LangContext } from '../App'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, LogOut, Globe, Shield, User, LayoutDashboard, Store, Zap } from 'lucide-react'
+import { Menu, X, LogOut, Globe, Shield, User, LayoutDashboard, Store, Zap, Users } from 'lucide-react'
 
 const Navbar = () => {
   const { lang, setLang, t } = useContext(LangContext)
@@ -21,7 +21,7 @@ const Navbar = () => {
   const navLinks = [
     { label: t.nav.features, href: '/#features', icon: <Zap size={14} /> },
     { label: t.nav.products, href: '/products', icon: <Store size={14} /> },
-    { label: t.nav.community || 'COMMUNITY', href: 'https://discord.gg/zyrogg', external: true },
+    { label: t.nav.community || 'COMMUNITY', href: '/community', icon: <Users size={14} /> },
     ...(isAdmin ? [{ label: t.nav.admin || 'ADMIN', href: '/admin', icon: <Shield size={14} /> }] : []),
     ...(user && (role?.toUpperCase() === 'RESELLER' || isAdmin || user.discord_id === '1249488594414997676') ? [{ label: t.nav.reseller || 'RESELLER', href: '/reseller', icon: <Zap size={14} /> }] : [])
   ]

@@ -184,10 +184,42 @@ const initSchema = () => {
             status TEXT DEFAULT 'pending',
             pix_copia_e_cola TEXT,
             qrcode_base64 TEXT,
+            license_key TEXT DEFAULT NULL,
+            paid_at DATETIME DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
         );
+    `);
+
+    // Run migrations before defaults/seeds. Fresh databases create the base
+    // tables above, then these ALTERs add fields used by launcher/admin flows.
+    try { db.prepare('ALTER TABLE users ADD COLUMN password TEXT DEFAULT NULL').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN discord_access_token TEXT DEFAULT NULL').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN last_ip TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN last_heartbeat DATETIME').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN category_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN image_url TEXT').run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN status TEXT DEFAULT 'UNDETECTED'").run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN integrity_hash TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN current_version TEXT DEFAULT "1.0.0"').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN download_url TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE products ADD COLUMN changelog TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE user_products ADD COLUMN plan_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE user_products ADD COLUMN hwid_reset_at DATETIME').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN role TEXT DEFAULT "user"').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE users ADD COLUMN reseller_balance REAL DEFAULT 0').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN product_id INTEGER').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE launcher_versions ADD COLUMN file_path TEXT').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE payments ADD COLUMN license_key TEXT DEFAULT NULL').run(); } catch (e) { }
+    try { db.prepare('ALTER TABLE payments ADD COLUMN paid_at DATETIME DEFAULT NULL').run(); } catch (e) { }
+
+    db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_users_discord_id ON users(discord_id);
+        CREATE INDEX IF NOT EXISTS idx_user_products_user_id ON user_products(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_products_product_id ON user_products(product_id);
+        CREATE INDEX IF NOT EXISTS idx_user_products_license_key ON user_products(license_key);
+        CREATE INDEX IF NOT EXISTS idx_payments_transaction_id ON payments(transaction_id);
     `);
 
     // Default settings
@@ -206,8 +238,6 @@ const initSchema = () => {
 
     for (const [key, val] of defaultSettings) {
         db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, val);
-        // Update existing settings to ensure they have the latest values
-        db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(val, key);
     }
 
     // Helper function to ensure integer conversion

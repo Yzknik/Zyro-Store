@@ -4,16 +4,61 @@ import axios from 'axios';
 import { generateLicenseKey } from '../utils/keyGen.js';
 
 const PROMISSE_URL = 'https://api.promisse.com.br/transactions';
+const WITHDRAW_URL = 'https://api.promisse.com.br/withdrawals';
+
+const getWebhookSecret = () => {
+    const secret = process.env.WEBHOOK_SECRET?.trim();
+    return secret && secret.length >= 16 ? secret : null;
+};
+
+const isPrivilegedPaymentUser = (user: any) => {
+    const role = String(user?.role || '').toUpperCase();
+    return role === 'OWNER' || role === 'ADMIN' || user?.isAdmin === true;
+};
+
+const grantLicenseForPayment = (payment: any) => {
+    if (!payment) throw new Error('PAYMENT_NOT_FOUND');
+    if (payment.license_key) return payment.license_key;
+
+    const plan: any = db.prepare('SELECT * FROM plans WHERE id = ?').get(payment.plan_id);
+    if (!plan) throw new Error('PLAN_NOT_FOUND');
+
+    const licenseKey = generateLicenseKey();
+    const expiresAt = plan.duration_days > 0
+        ? new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+    const tx = db.transaction(() => {
+        const current: any = db.prepare('SELECT license_key FROM payments WHERE transaction_id = ?').get(payment.transaction_id);
+        if (current?.license_key) return current.license_key;
+
+        db.prepare('UPDATE payments SET status = "paid", license_key = ?, paid_at = datetime(\'now\') WHERE transaction_id = ?').run(licenseKey, payment.transaction_id);
+        db.prepare(`
+            INSERT INTO user_products (user_id, product_id, plan_id, license_key, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(payment.user_id, plan.product_id, plan.id, licenseKey, expiresAt);
+
+        return licenseKey;
+    });
+
+    return tx();
+};
 
 export const createPayment = async (req: Request, res: Response) => {
     try {
         const { plan_id } = req.body;
         const user = (req as any).user;
         const SECRET_KEY = process.env.PROMISSE_SECRET_KEY;
+        const webhookToken = getWebhookSecret();
 
         if (!SECRET_KEY) {
             console.error('[CRITICAL] PROMISSE_SECRET_KEY is missing in .env');
-            return res.status(500).json({ error: 'Payment system misconfigured. Missing API Key.' });
+            return res.status(500).json({ error: 'PAYMENT_MISCONFIGURED' });
+        }
+
+        if (!webhookToken) {
+            console.error('[CRITICAL] WEBHOOK_SECRET is missing or too short in .env');
+            return res.status(500).json({ error: 'WEBHOOK_MISCONFIGURED' });
         }
 
         if (!plan_id) return res.status(400).json({ error: 'Plan ID is required' });
@@ -21,38 +66,30 @@ export const createPayment = async (req: Request, res: Response) => {
         const plan: any = db.prepare('SELECT p.*, prod.name as product_name FROM plans p JOIN products prod ON p.product_id = prod.id WHERE p.id = ?').get(plan_id);
         if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-        const amountInCents = Math.round(plan.price * 100);
+        const amountInCents = Math.round(Number(plan.price) * 100);
 
-        console.log(`[PAYMENT-LOG] Creating transaction for user ${user.id}, Plan: ${plan.name}, Amount: ${amountInCents} cents`);
-
-        // Promisse Pay requires amount in cents
         try {
-            const webhookToken = process.env.WEBHOOK_SECRET || 'ZYRO-FALLBACK-SEC';
             const response = await axios.post(PROMISSE_URL, {
                 amount: amountInCents,
                 webhook: `${process.env.BASE_URL || 'https://zyroapi.shardweb.app'}/api/payment/webhook?token=${webhookToken}`
             }, {
                 headers: {
-                    'Authorization': SECRET_KEY,
+                    Authorization: SECRET_KEY,
                     'Content-Type': 'application/json'
                 },
-                timeout: 10000 // 10s timeout
+                timeout: 10000
             });
 
             const data = response.data;
-            console.log('[PAYMENT-DEBUG] Response Data:', JSON.stringify(data, null, 2));
-
-            // Handle both flat and nested structures from Promisse documentation
             const transaction_id = data.transaction?.id || data.id || data.transaction_id;
             const pixCode = data.pixCopiaECola || data.copyPaste || data.pixCode;
             const qrCodeBase64 = data.qrcode?.base64 || data.qrCodeBase64 || data.qrcode;
 
             if (!transaction_id) {
-                console.error('[PAYMENT-ERROR] Missing transaction_id in response:', data);
+                console.error('[PAYMENT-ERROR] Missing transaction_id in gateway response');
                 return res.status(500).json({
                     error: 'INVALID_GATEWAY_RESPONSE',
-                    message: 'A API de pagamento não retornou um ID de transação válido.',
-                    debug: data
+                    message: 'A API de pagamento nao retornou um ID de transacao valido.'
                 });
             }
 
@@ -62,7 +99,7 @@ export const createPayment = async (req: Request, res: Response) => {
             `).run(user.id, plan_id, transaction_id, plan.price, pixCode || '', qrCodeBase64 || '');
 
             res.json({
-                transaction_id: transaction_id,
+                transaction_id,
                 pix_copia_e_cola: pixCode,
                 qrcode_base64: qrCodeBase64
             });
@@ -73,42 +110,27 @@ export const createPayment = async (req: Request, res: Response) => {
                 message: apiErr.response?.data?.message || 'Gateway communication failed'
             });
         }
-
     } catch (error: any) {
         console.error('[INTERNAL-PAYMENT-ERROR]', error);
-        res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message });
+        res.status(500).json({ error: 'INTERNAL_ERROR', message: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : error.message });
     }
 };
 
 export const handleWebhook = async (req: Request, res: Response) => {
     try {
         const { token } = req.query;
-        if (!token || token !== (process.env.WEBHOOK_SECRET || 'ZYRO-FALLBACK-SEC')) {
+        const webhookSecret = getWebhookSecret();
+        if (!webhookSecret || !token || token !== webhookSecret) {
             console.warn(`[SEC-WARNING] Unauthorized webhook attempt from IP: ${req.ip}`);
             return res.status(403).send('Forbidden');
         }
-        const { id, status } = req.body;
 
+        const { id, status } = req.body;
         if (status === 'paid') {
             const payment: any = db.prepare('SELECT * FROM payments WHERE transaction_id = ?').get(id);
-            if (payment && payment.status === 'pending') {
-                // 1. Update payment status
-                db.prepare('UPDATE payments SET status = "paid" WHERE transaction_id = ?').run(id);
-
-                // 2. Grant license
-                const plan: any = db.prepare('SELECT * FROM plans WHERE id = ?').get(payment.plan_id);
-                const licenseKey = generateLicenseKey();
-
-                const expiresAt = plan.duration_days > 0
-                    ? new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString()
-                    : null;
-
-                db.prepare(`
-                    INSERT INTO user_products (user_id, product_id, plan_id, license_key, expires_at)
-                    VALUES (?, ?, ?, ?, ?)
-                `).run(payment.user_id, plan.product_id, plan.id, licenseKey, expiresAt);
-
-                console.log(`✅ [Promisse] Payment ${id} confirmed. Key ${licenseKey} issued.`);
+            if (payment) {
+                const licenseKey = grantLicenseForPayment(payment);
+                console.log(`[Promisse] Payment ${id} confirmed. Key ${licenseKey} issued.`);
             }
         }
 
@@ -123,81 +145,69 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
     try {
         const { transaction_id } = req.params;
         const SECRET_KEY = process.env.PROMISSE_SECRET_KEY;
+        const user = (req as any).user;
 
-        let payment: any = db.prepare('SELECT * FROM payments WHERE transaction_id = ?').get(transaction_id);
+        const payment: any = db.prepare('SELECT * FROM payments WHERE transaction_id = ?').get(transaction_id);
         if (!payment) return res.status(404).json({ error: 'Payment not found' });
+        if (!isPrivilegedPaymentUser(user) && Number(payment.user_id) !== Number(user?.id)) {
+            return res.status(403).json({ error: 'Payment not found' });
+        }
 
-        // If still pending, poll the API as a fallback (useful if webhooks fail on localhost)
+        let status = payment.status;
         if (payment.status === 'pending' && SECRET_KEY) {
             try {
                 const response = await axios.get(`${PROMISSE_URL}/${transaction_id}`, {
-                    headers: { 'Authorization': SECRET_KEY }
+                    headers: { Authorization: SECRET_KEY }
                 });
 
                 const data = response.data;
                 const apiStatus = data.transaction?.status || data.status;
 
                 if (apiStatus === 'paid') {
-                    console.log(`[POLLING-FALLBACK] Payment ${transaction_id} confirmed via API poll.`);
-
-                    // Grant license logic repeated here for fallback
-                    db.prepare('UPDATE payments SET status = "paid" WHERE transaction_id = ?').run(transaction_id);
-                    const plan: any = db.prepare('SELECT * FROM plans WHERE id = ?').get(payment.plan_id);
-                    const licenseKey = generateLicenseKey();
-                    const expiresAt = plan.duration_days > 0
-                        ? new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString()
-                        : null;
-
-                    db.prepare(`
-                        INSERT INTO user_products (user_id, product_id, plan_id, license_key, expires_at)
-                        VALUES (?, ?, ?, ?, ?)
-                    `).run(payment.user_id, plan.product_id, plan.id, licenseKey, expiresAt);
-
-                    payment.status = 'paid';
+                    grantLicenseForPayment(payment);
+                    status = 'paid';
                 }
             } catch (pollErr: any) {
                 console.error('[POLLING-ERROR] Failed to check status with gateway:', pollErr.message);
             }
         }
 
-        res.json({ status: payment.status });
+        res.json({ status });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
-const WITHDRAW_URL = 'https://api.promisse.com.br/withdrawals';
 
 export const requestWithdrawal = async (req: Request, res: Response) => {
     try {
-        const { amount, pixKey } = req.body; // Amount in BRL (real)
+        const { amount, pixKey } = req.body;
         const user = (req as any).user;
         const SECRET_KEY = process.env.PROMISSE_SECRET_KEY;
+        const webhookToken = getWebhookSecret();
 
-        if (!SECRET_KEY) return res.status(500).json({ error: 'Configuração de API ausente.' });
-        if (!amount || amount <= 0) return res.status(400).json({ error: 'Valor inválido.' });
-        if (!pixKey) return res.status(400).json({ error: 'Chave PIX obrigatória.' });
+        if (!SECRET_KEY) return res.status(500).json({ error: 'Configuracao de API ausente.' });
+        if (!webhookToken) return res.status(500).json({ error: 'Configuracao de webhook ausente.' });
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'Valor invalido.' });
+        if (!pixKey) return res.status(400).json({ error: 'Chave PIX obrigatoria.' });
 
-        const amountInCents = Math.round(amount * 100);
+        const amountInCents = Math.round(Number(amount) * 100);
 
-        // Security: Check balance if not Owner
-        if (user.role?.toUpperCase() !== 'OWNER') {
+        if (String(user.role || '').toUpperCase() !== 'OWNER') {
             const userData: any = db.prepare('SELECT reseller_balance FROM users WHERE id = ?').get(user.id);
             if (!userData || userData.reseller_balance < amount) {
                 return res.status(400).json({ error: 'Saldo insuficiente para saque.' });
             }
-            // Deduct balance immediately (reservation)
             db.prepare('UPDATE users SET reseller_balance = reseller_balance - ? WHERE id = ?').run(amount, user.id);
         }
 
         try {
-            const webhookToken = process.env.WEBHOOK_SECRET || 'ZYRO-FALLBACK-SEC';
             const response = await axios.post(WITHDRAW_URL, {
                 amount: amountInCents,
-                pixKey: pixKey,
+                pixKey,
                 webhook: `${process.env.BASE_URL || 'https://zyroapi.shardweb.app'}/api/payment/withdraw-webhook?token=${webhookToken}`
             }, {
                 headers: {
-                    'Authorization': SECRET_KEY,
+                    Authorization: SECRET_KEY,
                     'Content-Type': 'application/json'
                 }
             });
@@ -210,26 +220,27 @@ export const requestWithdrawal = async (req: Request, res: Response) => {
                 VALUES (?, ?, ?, ?, ?)
             `).run(user.id, amount, pixKey, withdrawId, 'processing');
 
-            res.json({ success: true, message: 'Solicitação de saque enviada com sucesso.', id: withdrawId });
+            res.json({ success: true, message: 'Solicitacao de saque enviada com sucesso.', id: withdrawId });
         } catch (apiErr: any) {
-            // Refund if reseller and API failed
-            if (user.role?.toUpperCase() !== 'OWNER') {
+            if (String(user.role || '').toUpperCase() !== 'OWNER') {
                 db.prepare('UPDATE users SET reseller_balance = reseller_balance + ? WHERE id = ?').run(amount, user.id);
             }
             console.error('[WITHDRAW-ERROR]', apiErr.response?.data || apiErr.message);
             res.status(500).json({ error: 'Erro na API de Saque', details: apiErr.response?.data?.message || apiErr.message });
         }
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'SERVICE_ERROR' : err.message });
     }
 };
 
 export const handleWithdrawalWebhook = async (req: Request, res: Response) => {
     try {
         const { token } = req.query;
-        if (!token || token !== (process.env.WEBHOOK_SECRET || 'ZYRO-FALLBACK-SEC')) {
+        const webhookSecret = getWebhookSecret();
+        if (!webhookSecret || !token || token !== webhookSecret) {
             return res.status(403).send('Forbidden');
         }
+
         const { id, status } = req.body;
         console.log(`[WITHDRAW-WEBHOOK] Status update for ${id}: ${status}`);
 
@@ -238,10 +249,9 @@ export const handleWithdrawalWebhook = async (req: Request, res: Response) => {
 
         db.prepare('UPDATE withdrawals SET status = ? WHERE transaction_id = ?').run(status, id);
 
-        // If it failed, refund the reseller
         if (status === 'failed') {
             const user: any = db.prepare('SELECT role FROM users WHERE id = ?').get(withdrawal.user_id);
-            if (user && user.role?.toUpperCase() !== 'OWNER') {
+            if (user && String(user.role || '').toUpperCase() !== 'OWNER') {
                 db.prepare('UPDATE users SET reseller_balance = reseller_balance + ? WHERE id = ?').run(withdrawal.amount, withdrawal.user_id);
                 console.log(`[WITHDRAW-REFUND] Refunded ${withdrawal.amount} to user ${withdrawal.user_id} due to failure.`);
             }

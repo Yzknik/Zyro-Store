@@ -32,6 +32,7 @@ router.delete('/categories/:id', adminController.deleteCategory);
 
 // Products
 router.post('/products', adminController.createProduct);
+router.patch('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
 // Plans
