@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, X, Copy, QrCode, Loader2, ChevronRight, Zap, Shield, Target } from 'lucide-react'
+import { canAccessRole, getRoleMeta, saleModeMeta } from '../roles'
 
 const InfoModal = ({ product, isOpen, onClose }) => {
     if (!product || !isOpen) return null;
@@ -26,7 +27,7 @@ const InfoModal = ({ product, isOpen, onClose }) => {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '15px' }}>
                             <span>Status</span>
-                            <span style={{ color: '#22c55e', fontWeight: '900' }}>UNDETECTED</span>
+                            <span style={{ color: '#22c55e', fontWeight: '900' }}>{product.status || 'UNDETECTED'}</span>
                         </div>
                         <p style={{ marginTop: '15px', fontSize: '0.9rem', lineHeight: '1.6' }}>{product.description}</p>
                     </div>
@@ -210,10 +211,15 @@ const PaymentModal = ({ product, isOpen, onClose }) => {
     )
 }
 
-const ProductCard = ({ product, index, onPurchase }) => {
+const ProductCard = ({ product, index, onPurchase, userRole }) => {
     const cheapestPlan = product.plans && product.plans.length > 0
         ? product.plans.reduce((prev, curr) => prev.price < curr.price ? prev : curr)
         : null;
+    const mode = saleModeMeta(product.sale_mode)
+    const required = getRoleMeta(product.required_role)
+    const blockedByMode = String(product.sale_mode || 'available').toLowerCase() === 'blocked'
+    const blockedByRole = !canAccessRole(userRole, product.required_role)
+    const canBuy = cheapestPlan && !blockedByMode && !blockedByRole
 
     return (
         <div style={{
@@ -231,10 +237,10 @@ const ProductCard = ({ product, index, onPurchase }) => {
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0c0c0c, transparent)' }} />
                     <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
                         <span style={{
-                            background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)',
-                            color: '#22c55e', fontSize: '0.6rem', padding: '4px 10px', borderRadius: '30px', fontWeight: '900'
+                            background: mode.bg, border: `1px solid ${mode.color}33`,
+                            color: mode.color, fontSize: '0.6rem', padding: '4px 10px', borderRadius: '30px', fontWeight: '900'
                         }}>
-                            • UNDETECTED
+                            {mode.label.toUpperCase()}
                         </span>
                     </div>
                 </div>
@@ -245,19 +251,24 @@ const ProductCard = ({ product, index, onPurchase }) => {
                         {product.category_name || 'ELITE SOFTWARE'}
                     </div>
                     <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fff', marginBottom: '12px', letterSpacing: '-0.5px' }}>{product.name}</h3>
+                    {product.required_role && product.required_role !== 'user' && (
+                        <span style={{ width: 'fit-content', marginBottom: '12px', color: required.color, background: required.bg, border: `1px solid ${required.color}33`, padding: '5px 10px', borderRadius: '999px', fontSize: '0.65rem', fontWeight: 900 }}>
+                            ACESSO {required.label.toUpperCase()}
+                        </span>
+                    )}
                     <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.4)', lineHeight: '1.7', marginBottom: '32px', flex: 1 }}>
                         {product.description}
                     </p>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         <div>
-                            {cheapestPlan ? (
+                            {canBuy ? (
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fff' }}>R$ {cheapestPlan.price.toFixed(2)}</span>
                                     <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontWeight: '800' }}>STARTING PRICE</span>
                                 </div>
                             ) : (
-                                <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.2)', fontWeight: '800' }}>COMING SOON</span>
+                                <span style={{ fontSize: '0.8rem', color: blockedByRole ? required.color : mode.color, fontWeight: '900' }}>{blockedByRole ? `${required.label.toUpperCase()} ONLY` : 'COMING SOON'}</span>
                             )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px', marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -269,10 +280,11 @@ const ProductCard = ({ product, index, onPurchase }) => {
                             </button>
                             <button
                                 onClick={() => onPurchase(product, 'buy')}
+                                disabled={!canBuy}
                                 className="btn-premium"
-                                style={{ flex: 1, padding: '12px 28px', fontSize: '0.7rem', background: '#3366ff', border: 'none' }}
+                                style={{ flex: 1, padding: '12px 28px', fontSize: '0.7rem', background: canBuy ? '#2563eb' : 'rgba(255,255,255,0.06)', color: canBuy ? '#fff' : 'rgba(255,255,255,0.35)', border: 'none', cursor: canBuy ? 'pointer' : 'not-allowed' }}
                             >
-                                PURCHASE
+                                {String(product.sale_mode || '').toLowerCase() === 'presale' ? 'PRE-ORDER' : canBuy ? 'PURCHASE' : 'LOCKED'}
                                 <ChevronRight size={14} />
                             </button>
                         </div>
@@ -284,6 +296,7 @@ const ProductCard = ({ product, index, onPurchase }) => {
 }
 
 const ProductsPage = () => {
+    const { role } = useAuth()
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
     const [activeCat, setActiveCat] = useState('all')
@@ -334,7 +347,7 @@ const ProductsPage = () => {
     })
 
     return (
-        <div style={{ minHeight: '100vh', background: '#050505', color: '#fff' }}>
+        <div className="zyro-page-bg" style={{ minHeight: '100vh', color: '#fff' }}>
             <Navbar />
 
             {selectedProduct && (
@@ -444,7 +457,7 @@ const ProductsPage = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '40px' }}>
                             {filtered.length > 0 ? (
                                 filtered.map((p, i) => (
-                                    <ProductCard key={p.id} product={p} index={i} onPurchase={handleOpenPurchase} />
+                                    <ProductCard key={p.id} product={p} index={i} onPurchase={handleOpenPurchase} userRole={role} />
                                 ))
                             ) : (
                                 <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', opacity: 0.3 }}>

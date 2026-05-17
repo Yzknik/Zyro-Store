@@ -5,6 +5,7 @@ import News from '../models/newsModel.js';
 import Settings from '../models/settingsModel.js';
 import db from '../config/db.js';
 import { generateLicenseKey } from '../utils/keyGen.js';
+import { syncDiscordAppRole } from '../utils/roles.js';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -280,7 +281,7 @@ export const getPublicInfo = async (req: Request, res: Response) => {
         const news = News.getAll().slice(0, 5);
         const settings = Settings.getAll();
         const products = db.prepare(`
-            SELECT p.id, p.name, p.description, p.image_url, p.status, p.current_version, p.download_url, p.changelog,
+            SELECT p.id, p.name, p.description, p.image_url, p.status, p.current_version, p.download_url, p.changelog, p.sale_mode, p.required_role,
                    (SELECT lv.created_at FROM launcher_versions lv WHERE lv.product_id = p.id ORDER BY lv.created_at DESC LIMIT 1) as last_release_at
             FROM products p
             ORDER BY p.id DESC
@@ -419,10 +420,12 @@ export const listUsers = (req: Request, res: Response) => {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
 };
 
-export const updateUserRole = (req: Request, res: Response) => {
+export const updateUserRole = async (req: Request, res: Response) => {
     try {
         const { role } = req.body;
         db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, getId(req.params.id));
+        const changedUser: any = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(getId(req.params.id));
+        if (changedUser?.discord_id) await syncDiscordAppRole(changedUser.discord_id, role);
         const reqUser = (req as any).user;
         if (reqUser) logSystemEvent(reqUser.id, 'ALTERAÇÃO DE CARGO', `Alterou cargo do usuário ID ${req.params.id} para ${role}`);
         res.json({ success: true });

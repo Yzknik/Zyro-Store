@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import db from '../config/db.js';
 import axios from 'axios';
 import { generateLicenseKey } from '../utils/keyGen.js';
+import { canAccessRole, syncDiscordAppRole } from '../utils/roles.js';
 
 const PROMISSE_URL = 'https://api.promisse.com.br/transactions';
 const WITHDRAW_URL = 'https://api.promisse.com.br/withdrawals';
@@ -16,14 +17,14 @@ const isPrivilegedPaymentUser = (user: any) => {
     return role === 'OWNER' || role === 'ADMIN' || user?.isAdmin === true;
 };
 
-const grantLicenseForPayment = (payment: any) => {
+const grantLicenseForPayment = async (payment: any) => {
     if (!payment) throw new Error('PAYMENT_NOT_FOUND');
     if (payment.license_key) return payment.license_key;
 
     const plan: any = db.prepare('SELECT * FROM plans WHERE id = ?').get(payment.plan_id);
     if (!plan) throw new Error('PLAN_NOT_FOUND');
 
-    const licenseKey = generateLicenseKey();
+    const generatedLicenseKey = generateLicenseKey();
     const expiresAt = plan.duration_days > 0
         ? new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString()
         : null;
@@ -32,16 +33,26 @@ const grantLicenseForPayment = (payment: any) => {
         const current: any = db.prepare('SELECT license_key FROM payments WHERE transaction_id = ?').get(payment.transaction_id);
         if (current?.license_key) return current.license_key;
 
-        db.prepare('UPDATE payments SET status = "paid", license_key = ?, paid_at = datetime(\'now\') WHERE transaction_id = ?').run(licenseKey, payment.transaction_id);
+        db.prepare('UPDATE payments SET status = "paid", license_key = ?, paid_at = datetime(\'now\') WHERE transaction_id = ?').run(generatedLicenseKey, payment.transaction_id);
         db.prepare(`
             INSERT INTO user_products (user_id, product_id, plan_id, license_key, expires_at)
             VALUES (?, ?, ?, ?, ?)
-        `).run(payment.user_id, plan.product_id, plan.id, licenseKey, expiresAt);
+        `).run(payment.user_id, plan.product_id, plan.id, generatedLicenseKey, expiresAt);
 
-        return licenseKey;
+        return generatedLicenseKey;
     });
 
-    return tx();
+    const licenseKey = tx();
+    const user: any = db.prepare('SELECT discord_id, role FROM users WHERE id = ?').get(payment.user_id);
+    if (user) {
+        if (String(user.role || '').toLowerCase() === 'user') {
+            db.prepare("UPDATE users SET role = 'client' WHERE id = ?").run(payment.user_id);
+            user.role = 'client';
+        }
+        await syncDiscordAppRole(user.discord_id, user.role || 'client');
+    }
+
+    return licenseKey;
 };
 
 export const createPayment = async (req: Request, res: Response) => {
@@ -63,8 +74,14 @@ export const createPayment = async (req: Request, res: Response) => {
 
         if (!plan_id) return res.status(400).json({ error: 'Plan ID is required' });
 
-        const plan: any = db.prepare('SELECT p.*, prod.name as product_name FROM plans p JOIN products prod ON p.product_id = prod.id WHERE p.id = ?').get(plan_id);
+        const plan: any = db.prepare('SELECT p.*, prod.name as product_name, prod.sale_mode, prod.required_role FROM plans p JOIN products prod ON p.product_id = prod.id WHERE p.id = ?').get(plan_id);
         if (!plan) return res.status(404).json({ error: 'Plan not found' });
+        if (String(plan.sale_mode || 'available').toLowerCase() === 'blocked') {
+            return res.status(403).json({ error: 'SALE_BLOCKED', message: 'Esse produto ainda nao esta disponivel para venda.' });
+        }
+        if (!canAccessRole(user.role, plan.required_role)) {
+            return res.status(403).json({ error: 'ROLE_REQUIRED', message: `Esse produto esta liberado apenas para ${String(plan.required_role || 'cargo autorizado').toUpperCase()}.` });
+        }
 
         const amountInCents = Math.round(Number(plan.price) * 100);
 
@@ -129,7 +146,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
         if (status === 'paid') {
             const payment: any = db.prepare('SELECT * FROM payments WHERE transaction_id = ?').get(id);
             if (payment) {
-                const licenseKey = grantLicenseForPayment(payment);
+                const licenseKey = await grantLicenseForPayment(payment);
                 console.log(`[Promisse] Payment ${id} confirmed. Key ${licenseKey} issued.`);
             }
         }
@@ -164,7 +181,7 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
                 const apiStatus = data.transaction?.status || data.status;
 
                 if (apiStatus === 'paid') {
-                    grantLicenseForPayment(payment);
+                    await grantLicenseForPayment(payment);
                     status = 'paid';
                 }
             } catch (pollErr: any) {

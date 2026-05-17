@@ -157,7 +157,9 @@ const ActivityChart = ({ data, color = "#3b82f6", label = "vendas" }) => {
 
 const ROLES = [
     { value: 'user', label: 'USER', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.04)', icon: '👤', desc: 'Acesso padrão ao painel' },
-    { value: 'reseller', label: 'RESELLER', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', icon: '💹', desc: 'Pode gerar chaves com saldo' },
+    { value: 'client', label: 'CLIENT', color: '#38bdf8', bg: 'rgba(56,189,248,0.08)', icon: 'C', desc: 'Cliente com compra ativa/tag no site' },
+    { value: 'tester', label: 'TESTER', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: 'T', desc: 'Acesso a produtos em teste' },
+    { value: 'beta', label: 'BETA', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', icon: 'B', desc: 'Acesso a builds beta' },    { value: 'reseller', label: 'RESELLER', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', icon: '💹', desc: 'Pode gerar chaves com saldo' },
     { value: 'admin', label: 'ADMIN', color: '#3366ff', bg: 'rgba(51, 102, 255, 0.08)', icon: '⚡', desc: 'Acesso total ao painel admin' },
 ];
 
@@ -261,7 +263,7 @@ const AdminPage = () => {
     const [userSearch, setUserSearch] = useState('')
 
     const [newCatName, setNewCatName] = useState('')
-    const [newProduct, setNewProduct] = useState({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
+    const [newProduct, setNewProduct] = useState({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', sale_mode: 'available', required_role: 'user', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
     const [newPlan, setNewPlan] = useState({ product_id: '', name: '', duration_days: 0, price: 0 })
     const [newLicense, setNewLicense] = useState({ discord_id: '', product_id: '', plan_id: '', duration_days: 0 })
     const [newModId, setNewModId] = useState('')
@@ -367,7 +369,7 @@ const AdminPage = () => {
         e.preventDefault()
         try {
             await axios.post(`${API_URL}/api/admin/products`, newProduct, { withCredentials: true })
-            setNewProduct({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
+            setNewProduct({ name: '', description: '', category_id: '', image_url: '', status: 'UNDETECTED', sale_mode: 'available', required_role: 'user', integrity_hash: '', current_version: '1.0.0', download_url: '', changelog: '' })
             fetchProducts(); notify('PRODUTO LANÇADO COM SUCESSO!')
         } catch (err) { notify(err.response?.data?.error || err.message, 'error') }
     }
@@ -384,6 +386,8 @@ const AdminPage = () => {
             category_id: product.category_id || '',
             current_version: product.current_version || '1.0.0',
             status: product.status || 'UNDETECTED',
+            sale_mode: product.sale_mode || 'available',
+            required_role: product.required_role || 'user',
             download_url: product.download_url || '',
             changelog: product.changelog || '',
             image_url: product.image_url || '',
@@ -949,6 +953,16 @@ const AdminPage = () => {
                                         <option value="TESTING">TESTING</option>
                                         <option value="DETECTED">DETECTED</option>
                                     </select>
+                                    <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <select value={newProduct.sale_mode} onChange={e => setNewProduct({ ...newProduct, sale_mode: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                            <option value="available">Venda aberta</option>
+                                            <option value="presale">Pre-venda</option>
+                                            <option value="blocked">Venda bloqueada</option>
+                                        </select>
+                                        <select value={newProduct.required_role} onChange={e => setNewProduct({ ...newProduct, required_role: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                            {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                        </select>
+                                    </div>
                                     <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                                         <input type="text" placeholder="Versão (ex: 1.0.2)" value={newProduct.current_version} onChange={e => setNewProduct({ ...newProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />
                                         <input type="text" placeholder="GitHub Release URL inicial (.exe / .zip)" value={newProduct.download_url} onChange={e => setNewProduct({ ...newProduct, download_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
@@ -970,6 +984,16 @@ const AdminPage = () => {
                                             <option value="DETECTED">DETECTED</option>
                                             <option value="OFFLINE">OFFLINE</option>
                                         </select>
+                                        <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                            <select value={editingProduct.sale_mode || 'available'} onChange={e => setEditingProduct({ ...editingProduct, sale_mode: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                                <option value="available">Venda aberta</option>
+                                                <option value="presale">Pre-venda</option>
+                                                <option value="blocked">Venda bloqueada</option>
+                                            </select>
+                                            <select value={editingProduct.required_role || 'user'} onChange={e => setEditingProduct({ ...editingProduct, required_role: e.target.value })} style={{ width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', appearance: 'none', cursor: 'pointer', fontWeight: '700' }}>
+                                                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                            </select>
+                                        </div>
                                         <input type="text" placeholder="URL da imagem" value={editingProduct.image_url} onChange={e => setEditingProduct({ ...editingProduct, image_url: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none' }} />
                                         <div className="admin-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                                             <input type="text" placeholder="Versao" value={editingProduct.current_version} onChange={e => setEditingProduct({ ...editingProduct, current_version: e.target.value })} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px', color: '#fff', outline: 'none', fontWeight: '700' }} />

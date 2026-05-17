@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/userModel.js';
 import db from '../config/db.js';
 import dotenv from 'dotenv';
+import { assignDiscordRole as assignDiscordGuildRole, syncDiscordAppRole } from '../utils/roles.js';
 
 dotenv.config();
 
@@ -172,7 +173,7 @@ export const discordCallback = async (req: Request, res: Response) => {
             logSystemEvent(user.id, 'NOVO USUÁRIO / OAUTH DISCORD', 'Criou conta através do Discord Login.');
 
             // Tenta adicionar a tag/cargo de Verificado ao entrar no site pela primeira vez
-            if (VERIFIED_ROLE_ID) assignDiscordRole(discordUser.id, VERIFIED_ROLE_ID);
+            if (VERIFIED_ROLE_ID) await assignDiscordGuildRole(discordUser.id, VERIFIED_ROLE_ID);
         } else {
             User.update(discordUser.id, { username: discordUser.username, avatar: avatarUrl });
             user = User.findByDiscordId(discordUser.id);
@@ -245,6 +246,7 @@ export const finalizeAccount = async (req: any, res: Response) => {
         db.prepare('UPDATE users SET username = ?, password = ? WHERE discord_id = ?').run(username, hashedPassword, req.user.discord_id);
 
         const user = User.findByDiscordId(req.user.discord_id) as any;
+        await syncDiscordAppRole(req.user.discord_id, user?.role || 'user');
         logSystemEvent(user.id, 'CONTA FINALIZADA', 'Finalizou a configuração de conta e acesso com senha customizada.');
         res.json({ success: true, message: 'Account finalized' });
     } catch (err: any) {
@@ -347,14 +349,14 @@ export const getMe = async (req: any, res: Response) => {
 
         let products;
         if (isCEO) {
-            const allProducts = db.prepare('SELECT id as product_id, name, image_url, current_version, changelog, download_url FROM products').all();
+            const allProducts = db.prepare('SELECT id as product_id, name, image_url, current_version, changelog, download_url, sale_mode, required_role FROM products').all();
             products = allProducts.map((p: any) => ({
                 product_id: p.product_id, name: p.name, license_key: 'ZYRO-CEO-ACCESS-GOD-MODE', expires_at: null, status: 'active', hwid: 'BYPASS-SYSTEM',
-                image_url: p.image_url, current_version: p.current_version, changelog: p.changelog, download_url: p.download_url
+                image_url: p.image_url, current_version: p.current_version, changelog: p.changelog, download_url: p.download_url, sale_mode: p.sale_mode, required_role: p.required_role
             }));
         } else {
             products = db.prepare(`
-                SELECT up.id, up.product_id, p.name, p.image_url, up.license_key, up.expires_at, up.status, up.hwid, p.current_version, p.changelog, p.download_url
+                SELECT up.id, up.product_id, p.name, p.image_url, up.license_key, up.expires_at, up.status, up.hwid, p.current_version, p.changelog, p.download_url, p.sale_mode, p.required_role
                 FROM user_products up JOIN products p ON up.product_id = p.id WHERE up.user_id = ?`
             ).all(user.id);
         }

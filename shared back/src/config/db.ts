@@ -63,6 +63,8 @@ const initSchema = () => {
             name TEXT UNIQUE NOT NULL,
             description TEXT,
             image_url TEXT,
+            sale_mode TEXT DEFAULT 'available',
+            required_role TEXT DEFAULT 'user',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
         );
@@ -201,6 +203,8 @@ const initSchema = () => {
     try { db.prepare('ALTER TABLE products ADD COLUMN category_id INTEGER').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN image_url TEXT').run(); } catch (e) { }
     try { db.prepare("ALTER TABLE products ADD COLUMN status TEXT DEFAULT 'UNDETECTED'").run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN sale_mode TEXT DEFAULT 'available'").run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN required_role TEXT DEFAULT 'user'").run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN integrity_hash TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN current_version TEXT DEFAULT "1.0.0"').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN download_url TEXT').run(); } catch (e) { }
@@ -272,6 +276,8 @@ const initSchema = () => {
     try { db.prepare('ALTER TABLE products ADD COLUMN category_id INTEGER').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN image_url TEXT').run(); } catch (e) { }
     try { db.prepare("ALTER TABLE products ADD COLUMN status TEXT DEFAULT 'UNDETECTED'").run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN sale_mode TEXT DEFAULT 'available'").run(); } catch (e) { }
+    try { db.prepare("ALTER TABLE products ADD COLUMN required_role TEXT DEFAULT 'user'").run(); } catch (e) { }
     try { db.prepare('ALTER TABLE products ADD COLUMN integrity_hash TEXT').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE user_products ADD COLUMN plan_id INTEGER').run(); } catch (e) { }
     try { db.prepare('ALTER TABLE user_products ADD COLUMN hwid_reset_at DATETIME').run(); } catch (e) { }

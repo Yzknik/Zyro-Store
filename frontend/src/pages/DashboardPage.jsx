@@ -9,6 +9,7 @@ import { Navigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import API_URL from '../api'
 import { Boxes, Crown, Gauge, LifeBuoy, Settings2, ShieldCheck, Zap } from 'lucide-react'
+import { canAccessRole, getRoleMeta } from '../roles'
 
 const DashboardPage = () => {
     const { t } = useContext(LangContext)
@@ -90,11 +91,13 @@ const DashboardPage = () => {
     if (!user) return <Navigate to="/" />
 
     const isCEO = user.discord_id === '1249488594414997676'
-    const userRole = (role || (isAdmin ? 'STAFF' : 'MEMBER')).toUpperCase()
-    const finalRole = isCEO ? 'OWNER' : userRole
+    const rawRole = isCEO ? 'owner' : (role || (isAdmin ? 'admin' : 'user'))
+    const roleMeta = getRoleMeta(rawRole)
+    const finalRole = roleMeta.label.toUpperCase()
+    const hasTesterAccess = canAccessRole(rawRole, 'tester')
 
     return (
-        <div style={{ minHeight: '100vh', background: '#050505', color: '#fff' }}>
+        <div className="zyro-page-bg" style={{ minHeight: '100vh', color: '#fff' }}>
             <Navbar />
 
             <div style={{ paddingTop: '120px', paddingBottom: '100px', maxWidth: '1100px', margin: '0 auto', paddingLeft: '20px', paddingRight: '20px' }}>
@@ -118,8 +121,8 @@ const DashboardPage = () => {
                             <span style={{
                                 fontSize: '0.65rem',
                                 fontWeight: '800',
-                                color: finalRole === 'OWNER' ? '#ff4b2b' : (finalRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
-                                background: 'rgba(255,255,255,0.03)',
+                                color: roleMeta.color,
+                                background: roleMeta.bg,
                                 padding: '4px 10px',
                                 borderRadius: '4px',
                                 letterSpacing: '0.1em'
@@ -138,6 +141,7 @@ const DashboardPage = () => {
                         {[
                             { id: 'overview', label: 'Overview', icon: Gauge },
                             { id: 'licenses', label: 'My Products', icon: Boxes },
+                            ...(hasTesterAccess ? [{ id: 'tester', label: 'Tester Area', icon: Zap }] : []),
                             { id: 'configs', label: 'Cloud Configs', icon: Settings2 },
                             { id: 'security', label: 'HWID & History', icon: ShieldCheck },
                             { id: 'tickets', label: 'Support Tickets', icon: LifeBuoy }
@@ -248,7 +252,7 @@ const DashboardPage = () => {
                                                 <span style={{
                                                     fontSize: '0.7rem',
                                                     fontWeight: '950',
-                                                    color: finalRole === 'OWNER' ? '#ff4b2b' : (finalRole === 'RESELLER' ? '#22c55e' : '#3366ff'),
+                                                    color: roleMeta.color,
                                                     background: 'rgba(255,255,255,0.03)',
                                                     padding: '5px 12px',
                                                     borderRadius: '8px',
@@ -345,6 +349,36 @@ const DashboardPage = () => {
                                         <p>No products found in your account.</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'tester' && hasTesterAccess && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                                <div className="card" style={{ padding: '28px', borderColor: `${roleMeta.color}55`, background: `linear-gradient(135deg, ${roleMeta.bg}, rgba(11,19,32,0.88))` }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <div>
+                                            <p style={{ margin: 0, color: roleMeta.color, fontSize: '0.72rem', fontWeight: 950, letterSpacing: '0.16em' }}>ZYRO LAB ACCESS</p>
+                                            <h3 style={{ margin: '8px 0 8px', fontSize: '1.6rem', fontWeight: 900 }}>Area de Tester/Beta</h3>
+                                            <p style={{ margin: 0, color: 'rgba(255,255,255,0.52)', maxWidth: 640 }}>Produtos marcados como beta/tester aparecem aqui para testes antecipados, feedback e validacao antes da venda publica.</p>
+                                        </div>
+                                        <span style={{ color: roleMeta.color, background: roleMeta.bg, border: `1px solid ${roleMeta.color}44`, padding: '8px 14px', borderRadius: 999, fontSize: '0.7rem', fontWeight: 950 }}>{finalRole}</span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                                    {userProducts?.filter(p => canAccessRole(rawRole, p.required_role || 'user')).map((p, idx) => (
+                                        <div key={idx} className="card" style={{ padding: '22px' }}>
+                                            <p style={{ margin: 0, color: '#fff', fontWeight: 850 }}>{p.name}</p>
+                                            <p style={{ margin: '6px 0 14px', color: 'rgba(255,255,255,0.42)', fontSize: '0.82rem' }}>v{p.current_version || '1.0.0'} - canal de teste disponivel</p>
+                                            <button className="btn-outline" style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(37,99,235,0.1)', color: '#93c5fd', fontWeight: 800 }}>Abrir notas de teste</button>
+                                        </div>
+                                    ))}
+                                    {(!userProducts || userProducts.length === 0) && (
+                                        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>
+                                            Nenhum produto beta/tester vinculado ainda.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
