@@ -156,9 +156,8 @@ int main() {
 
 ## 📞 Contato
 
-- **Discord:** Junte-se ao nosso servidor
-- **Email:** contato@zyrostore.com
-
+- **Discord:** [Junte-se ao nosso servidor](https://discord.gg/HKxr9z4X9f)
+- **Discord:** thedevscuiudo
 ---
 
 <p align="center">
